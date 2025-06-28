@@ -103,7 +103,7 @@ const AdminDashboard: React.FC = () => {
       if (error) throw error;
 
       // Map to ActivityItem format
-      const activities: ActivityItem[] = activityLogs.data.map(log => {
+      const activities: ActivityItem[] = activityLogs.map(log => {
         // Format the message based on action and resource
         let message = '';
         switch (log.action) {
