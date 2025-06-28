@@ -247,14 +247,12 @@ class PremiumService {
         .eq('property_id', propertyId)
         .eq('status', 'active')
         .gt('end_date', new Date().toISOString())
-        .single();
+        .maybeSingle();
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          // No data found
-          return null;
-        }
-        throw error;
+      if (error) throw error;
+
+      if (!data) {
+        return null;
       }
 
       // Get the plan
@@ -375,14 +373,12 @@ class PremiumService {
         .eq('property_id', propertyId)
         .eq('status', 'active')
         .gt('end_date', new Date().toISOString())
-        .single();
+        .maybeSingle();
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          // No data found
-          return;
-        }
-        throw error;
+      if (error) throw error;
+
+      if (!data) {
+        return;
       }
 
       // Prepare updates based on the type
