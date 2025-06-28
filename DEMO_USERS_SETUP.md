@@ -1,66 +1,72 @@
 # Demo Users Setup Instructions
 
-After running the migration, you need to manually create the authentication users in your Supabase dashboard:
+The demo users are now automatically created when you run the database migrations. No manual setup is required!
 
-## Step 1: Access Supabase Dashboard
-1. Go to your Supabase project dashboard
-2. Navigate to Authentication > Users
+## Available Demo Users
 
-## Step 2: Create Demo Users
+After running the migration, you can log in with these credentials:
 
 ### Admin User
 - **Email**: `admin@propertipro.id`
 - **Password**: `admin123`
-- **User ID**: `11111111-1111-1111-1111-111111111111`
-- **Email Confirmed**: Yes
+- **Role**: Admin
+- **Access**: Can manage users, properties, and system settings
 
 ### Super Admin User
 - **Email**: `superadmin@propertipro.id`
 - **Password**: `admin123`
-- **User ID**: `22222222-2222-2222-2222-222222222222`
-- **Email Confirmed**: Yes
+- **Role**: Super Admin
+- **Access**: Full system access including admin management
 
-### Test User (Optional)
+### Test User
 - **Email**: `user@propertipro.id`
 - **Password**: `user123`
-- **User ID**: `33333333-3333-3333-3333-333333333333`
-- **Email Confirmed**: Yes
+- **Role**: Regular User
+- **Access**: Can create and manage their own property listings
 
-### Agent User (Optional)
+### Agent User
 - **Email**: `agent@propertipro.id`
 - **Password**: `agent123`
-- **User ID**: `44444444-4444-4444-4444-444444444444`
-- **Email Confirmed**: Yes
+- **Role**: Agent
+- **Access**: Enhanced user permissions for property management
 
-## Step 3: Manual Creation Process
+## How It Works
 
-1. Click "Add user" in the Supabase dashboard
-2. Choose "Create a new user"
-3. Enter the email and password
-4. **Important**: Set the User ID to the specific UUID mentioned above
-5. Make sure "Email confirmed" is checked
-6. Click "Create user"
+The demo users are created automatically through a database migration that:
 
-## Alternative: Using Supabase CLI (if available)
-
-If you have Supabase CLI access, you can create users programmatically:
-
-```sql
--- This would need to be run in the Supabase SQL editor or via API
--- Note: Direct auth.users insertion is not recommended in production
-```
+1. **Creates Authentication Users**: Inserts users into Supabase's `auth.users` table with confirmed emails
+2. **Creates User Profiles**: Automatically creates corresponding profiles with appropriate roles
+3. **Sets Up Permissions**: Ensures users have the correct access levels based on their roles
 
 ## Verification
 
-After creating the users:
-1. Try logging in with the demo credentials
-2. Check that the user profiles are properly linked
-3. Verify that the roles are correctly assigned
+After running the migration:
+1. Try logging in with any of the demo credentials above
+2. Check that you can access the appropriate dashboard based on the user role
+3. Verify that the user profiles are properly linked and roles are correctly assigned
 
-## Security Note
+## Security Notes
 
 **Important**: These are demo credentials for development only. In production:
-- Remove or change these default passwords
-- Use strong, unique passwords
-- Consider implementing additional security measures
-- Remove this setup file from production deployments
+
+- **Remove or change these default passwords**
+- **Use strong, unique passwords**
+- **Consider implementing additional security measures**
+- **Remove this setup file from production deployments**
+- **Delete the demo users migration file before deploying to production**
+
+## Troubleshooting
+
+If login still fails after running the migration:
+
+1. **Check Migration Status**: Ensure the migration ran successfully in your Supabase dashboard
+2. **Verify Database Connection**: Make sure your `.env` file has the correct Supabase credentials
+3. **Check Supabase Logs**: Look for any errors in the Supabase dashboard logs
+4. **Clear Browser Cache**: Sometimes cached authentication data can cause issues
+
+## Manual Verification (Optional)
+
+You can verify the users were created by checking in your Supabase dashboard:
+1. Go to Authentication > Users
+2. You should see the four demo users listed
+3. All should have "Email Confirmed" status
