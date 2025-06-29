@@ -1,0 +1,31 @@
+# Compiled output
+build/
+dist/
+.next/
+
+# Dependencies
+node_modules/
+
+# Tests & coverage
+coverage/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+
+# Misc
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.tmp
+.DS_Store
+
+# lockfiles
+# yarn.lock
+# pnpm-lock.yaml
+# package-lock.json
