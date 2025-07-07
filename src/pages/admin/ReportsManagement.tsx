@@ -3,10 +3,12 @@ import { Eye, AlertTriangle, Clock, CheckCircle, XCircle, Filter, MoreHorizontal
 import { Helmet } from 'react-helmet-async';
 import DataTable, { Column } from '../../components/admin/DataTable';
 import { Report, ModerationStats } from '../../types/admin';
-import { mockReports } from '../../data/reports';
+import { reportService } from '../../services/reportService';
 import { formatPrice } from '../../utils/formatter';
+import { useToast } from '../../contexts/ToastContext';
 
 const ReportsManagement: React.FC = () => {
+  const { showError, showSuccess } = useToast();
   const [reports, setReports] = useState<Report[]>([]);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -14,6 +16,7 @@ const ReportsManagement: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
+  const [isLoading, setIsLoading] = useState(true);
 
   const [stats, setStats] = useState<ModerationStats>({
     totalReports: 0,
@@ -27,35 +30,45 @@ const ReportsManagement: React.FC = () => {
   });
 
   useEffect(() => {
-    setReports(mockReports);
-    
-    // Calculate stats
-    const totalReports = mockReports.length;
-    const pendingReports = mockReports.filter(r => r.status === 'pending').length;
-    const resolvedReports = mockReports.filter(r => r.status === 'resolved').length;
-    const dismissedReports = mockReports.filter(r => r.status === 'dismissed').length;
-    
-    const reportsByType = mockReports.reduce((acc, report) => {
-      acc[report.type] = (acc[report.type] || 0) + 1;
-      return acc;
-    }, {} as { [key: string]: number });
-    
-    const reportsByPriority = mockReports.reduce((acc, report) => {
-      acc[report.priority] = (acc[report.priority] || 0) + 1;
-      return acc;
-    }, {} as { [key: string]: number });
+    fetchReports();
+    fetchStats();
+  }, [filterStatus, filterType, filterPriority]);
 
-    setStats({
-      totalReports,
-      pendingReports,
-      resolvedReports,
-      dismissedReports,
-      actionsToday: 3,
-      averageResolutionTime: 24,
-      reportsByType,
-      reportsByPriority,
-    });
-  }, []);
+  const fetchReports = async () => {
+    setIsLoading(true);
+    try {
+      const filters: any = {};
+      
+      if (filterStatus !== 'all') {
+        filters.status = filterStatus;
+      }
+      
+      if (filterType !== 'all') {
+        filters.type = filterType;
+      }
+      
+      if (filterPriority !== 'all') {
+        filters.priority = filterPriority;
+      }
+      
+      const data = await reportService.getAllReports(filters);
+      setReports(data);
+    } catch (error) {
+      console.error('Error fetching reports:', error);
+      showError('Error', 'Failed to load reports. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchStats = async () => {
+    try {
+      const stats = await reportService.getModerationStats();
+      setStats(stats);
+    } catch (error) {
+      console.error('Error fetching moderation stats:', error);
+    }
+  };
 
   const handleTakeAction = (report: Report) => {
     setSelectedReport(report);
@@ -114,14 +127,6 @@ const ReportsManagement: React.FC = () => {
     };
     return typeMap[type] || type;
   };
-
-  // Filter reports based on selected filters
-  const filteredReports = reports.filter(report => {
-    if (filterStatus !== 'all' && report.status !== filterStatus) return false;
-    if (filterType !== 'all' && report.type !== filterType) return false;
-    if (filterPriority !== 'all' && report.priority !== filterPriority) return false;
-    return true;
-  });
 
   const columns: Column<Report>[] = [
     {
@@ -365,13 +370,14 @@ const ReportsManagement: React.FC = () => {
       </div>
 
       <DataTable
-        data={filteredReports}
+        data={reports}
         columns={columns}
         actions={renderActions}
         searchable
         pagination
         pageSize={10}
         onRowClick={(report) => handleViewReport(report)}
+        loading={isLoading}
       />
 
       {/* Report Detail Modal */}
@@ -396,6 +402,8 @@ const ReportsManagement: React.FC = () => {
               prev.map(r => r.id === updatedReport.id ? updatedReport : r)
             );
             setShowActionModal(false);
+            fetchStats(); // Refresh stats after action
+            showSuccess('Action Taken', 'Moderation action has been successfully recorded.');
           }}
         />
       )}
@@ -625,6 +633,7 @@ const ModerationActionModal: React.FC<ModerationActionModalProps> = ({
   const [reason, setReason] = useState('');
   const [details, setDetails] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const { showError } = useToast();
 
   const actionOptions = [
     { value: 'approve', label: 'Setujui Properti', description: 'Properti valid, tolak laporan' },
@@ -638,12 +647,20 @@ const ModerationActionModal: React.FC<ModerationActionModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!selectedAction) {
+      showError('Action Required', 'Please select an action to take.');
+      return;
+    }
+    
+    if (!reason) {
+      showError('Reason Required', 'Please provide a reason for this action.');
+      return;
+    }
+    
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
       // Update report status based on action
       let newStatus: Report['status'] = 'resolved';
       let resolution = '';
@@ -655,18 +672,47 @@ const ModerationActionModal: React.FC<ModerationActionModalProps> = ({
         resolution = `Tindakan diambil: ${actionOptions.find(a => a.value === selectedAction)?.label}. ${reason}`;
       }
 
+      // Get current admin ID and name (in a real app, this would come from auth context)
+      const adminId = 'current-admin-id';
+      const adminName = 'Admin User';
+
+      // Update report status
+      await reportService.updateReportStatus(
+        report.id,
+        newStatus,
+        resolution,
+        adminId
+      );
+
+      // Create moderation action
+      await reportService.createModerationAction({
+        reportId: report.id,
+        propertyId: report.propertyId,
+        adminId,
+        adminName,
+        action: selectedAction,
+        reason,
+        details: details || undefined,
+        previousStatus: report.property.status,
+        newStatus: selectedAction === 'remove' ? 'removed' : 
+                  selectedAction === 'suspend' ? 'suspended' : 
+                  report.property.status
+      });
+
+      // Update the report object with new status
       const updatedReport: Report = {
         ...report,
         status: newStatus,
         resolution,
         resolvedAt: new Date().toISOString(),
-        resolvedBy: 'current-admin-id',
+        resolvedBy: adminId,
         updatedAt: new Date().toISOString(),
       };
 
       onActionTaken(updatedReport);
     } catch (error) {
       console.error('Error taking action:', error);
+      showError('Action Failed', 'Failed to process your action. Please try again.');
     } finally {
       setIsLoading(false);
     }

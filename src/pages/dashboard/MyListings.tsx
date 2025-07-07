@@ -281,6 +281,7 @@ const MyListings: React.FC = () => {
                   src={listing.image}
                   alt={listing.title}
                   className="w-full h-full object-cover"
+                  loading="lazy"
                 />
                 {listing.isPremium && (
                   <div className="absolute top-2 left-2">

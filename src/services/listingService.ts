@@ -1,7 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { Listing, PropertyMedia, UserListing, ListingFormData, ListingFilters } from '../types/listing';
 import { Property, PropertyType, ListingStatus, Location } from '../types';
-import { provinces, cities, districts } from '../data/locations';
 
 /**
  * Service for managing property listings
@@ -15,12 +14,10 @@ class ListingService {
     count: number;
   }> {
     try {
+      // Simplified query to avoid timeouts - only fetch basic listing data
       let query = supabase
         .from('listings')
-        .select(`
-          *,
-          property_media!inner(*)
-        `, { count: 'exact' });
+        .select('*', { count: 'exact' });
 
       // Apply filters
       if (filters) {
@@ -36,18 +33,65 @@ class ListingService {
           query = query.eq('purpose', filters.purpose);
         }
         
+        // Price range filters
         if (filters.priceRange) {
           const [min, max] = filters.priceRange;
           if (min !== null) query = query.gte('price', min);
           if (max !== null) query = query.lte('price', max);
         }
         
-        if (filters.bedrooms) {
-          query = query.gte('bedrooms', filters.bedrooms);
+        // Alternative price filters
+        if (filters.minPrice !== undefined) {
+          query = query.gte('price', filters.minPrice);
         }
         
-        if (filters.bathrooms) {
-          query = query.gte('bathrooms', filters.bathrooms);
+        if (filters.maxPrice !== undefined) {
+          query = query.lte('price', filters.maxPrice);
+        }
+        
+        // Bedroom filters
+        if (filters.minBedrooms !== undefined) {
+          query = query.gte('bedrooms', filters.minBedrooms);
+        }
+        
+        if (filters.maxBedrooms !== undefined) {
+          query = query.lte('bedrooms', filters.maxBedrooms);
+        }
+        
+        // Bathroom filters
+        if (filters.minBathrooms !== undefined) {
+          query = query.gte('bathrooms', filters.minBathrooms);
+        }
+        
+        if (filters.maxBathrooms !== undefined) {
+          query = query.lte('bathrooms', filters.maxBathrooms);
+        }
+        
+        // Building size filters
+        if (filters.minBuildingSize !== undefined) {
+          query = query.gte('building_size', filters.minBuildingSize);
+        }
+        
+        if (filters.maxBuildingSize !== undefined) {
+          query = query.lte('building_size', filters.maxBuildingSize);
+        }
+        
+        // Land size filters
+        if (filters.minLandSize !== undefined) {
+          query = query.gte('land_size', filters.minLandSize);
+        }
+        
+        if (filters.maxLandSize !== undefined) {
+          query = query.lte('land_size', filters.maxLandSize);
+        }
+        
+        // Floors filters
+        if (filters.minFloors !== undefined) {
+          query = query.gte('floors', filters.minFloors);
+        }
+        
+        if (filters.maxFloors !== undefined) {
+          query = query.lte('floors', filters.maxFloors);
         }
         
         if (filters.location) {
@@ -81,6 +125,18 @@ class ListingService {
           case 'views':
             query = query.order('views', { ascending: false });
             break;
+          case 'building_size_asc':
+            query = query.order('building_size', { ascending: true });
+            break;
+          case 'building_size_desc':
+            query = query.order('building_size', { ascending: false });
+            break;
+          case 'land_size_asc':
+            query = query.order('land_size', { ascending: true });
+            break;
+          case 'land_size_desc':
+            query = query.order('land_size', { ascending: false });
+            break;
           case 'premium':
             // First sort by is_promoted, then by created_at
             query = query.order('is_promoted', { ascending: false })
@@ -100,9 +156,22 @@ class ListingService {
       const { data, error, count } = await query;
       
       if (error) throw error;
+
+      // Fetch related data in bulk to avoid N+1 query problems
+      const enrichedListings = await this.enrichListingsWithRelatedData(data || []);
       
       // Transform data to Property interface
-      const properties: Property[] = await this.transformListingsToProperties(data || []);
+      let properties: Property[] = this.mapDbListingsToProperties(enrichedListings);
+      
+      // Filter by features if specified (this needs to be done client-side since Supabase doesn't support array contains all)
+      if (filters?.features && filters.features.length > 0) {
+        properties = properties.filter(property => {
+          // Check if property has all the required features
+          return filters.features!.every(feature => 
+            property.features.includes(feature)
+          );
+        });
+      }
       
       return {
         data: properties,
@@ -119,7 +188,6 @@ class ListingService {
    */
   async getListingById(id: string): Promise<Property | null> {
     try {
-      // Get the listing
       const { data: listing, error } = await supabase
         .from('listings')
         .select('*')
@@ -129,22 +197,10 @@ class ListingService {
       if (error) throw error;
       if (!listing) return null;
       
-      // Get the property media
-      const { data: media } = await supabase
-        .from('property_media')
-        .select('*')
-        .eq('listing_id', id)
-        .order('is_primary', { ascending: false });
+      // Fetch related data for a single listing
+      const enrichedListing = await this.enrichListingWithRelatedData(listing);
       
-      // Get the user profile (agent)
-      const { data: userProfile } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', listing.user_id)
-        .single();
-      
-      // Transform to Property interface
-      return this.transformListingToProperty(listing, media || [], userProfile);
+      return this.mapDbListingToProperty(enrichedListing);
     } catch (error) {
       console.error('Error fetching listing:', error);
       return null;
@@ -158,25 +214,23 @@ class ListingService {
     try {
       const { data, error } = await supabase
         .from('listings')
-        .select(`
-          *,
-          property_media(*)
-        `)
+        .select('*, premium_listings!fk_premium_property(status, end_date)')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
       
       if (error) throw error;
       
+      // Fetch location data for these listings
+      const enrichedListings = await this.enrichListingsWithLocationData(data || []);
+      
       // Transform to UserListing interface
-      const userListings: UserListing[] = await Promise.all((data || []).map(async (listing) => {
+      const userListings: UserListing[] = enrichedListings.map((listing) => {
         // Get location names
-        const province = provinces.find(p => p.id === listing.province_id)?.name || '';
-        const city = cities.find(c => c.id === listing.city_id)?.name || '';
+        const province = listing.province?.name || '';
+        const city = listing.city?.name || '';
         
-        // Get primary image
-        const media = listing.property_media || [];
-        const primaryImage = media.find(m => m.is_primary)?.media_url || 
-                            (media.length > 0 ? media[0].media_url : '');
+        // Use fallback image
+        const primaryImage = 'https://images.pexels.com/photos/106399/pexels-photo-106399.jpeg';
         
         // Map status
         let status: 'active' | 'inactive' | 'expired' | 'pending';
@@ -198,13 +252,9 @@ class ListingService {
         }
         
         // Check if premium
-        const { data: premiumData } = await supabase
-          .from('premium_listings')
-          .select('*')
-          .eq('property_id', listing.id)
-          .eq('status', 'active')
-          .gt('end_date', new Date().toISOString())
-          .single();
+        const premiumData = listing.premium_listings?.find(p => 
+          p.status === 'active' && new Date(p.end_date) > new Date()
+        );
         
         return {
           id: listing.id,
@@ -218,13 +268,18 @@ class ListingService {
           premiumExpiresAt: premiumData?.end_date,
           views: listing.views,
           createdAt: listing.created_at,
-          image: primaryImage || 'https://images.pexels.com/photos/106399/pexels-photo-106399.jpeg',
+          image: primaryImage,
           location: {
             city,
             province
-          }
+          },
+          bedrooms: listing.bedrooms || undefined,
+          bathrooms: listing.bathrooms || undefined,
+          buildingSize: listing.building_size || undefined,
+          landSize: listing.land_size || undefined,
+          floors: listing.floors || undefined
         };
-      }));
+      });
       
       return userListings;
     } catch (error) {
@@ -372,6 +427,178 @@ class ListingService {
   }
 
   /**
+   * Enrich listings with related data (locations, media, etc.)
+   * This avoids complex joins that can cause timeouts
+   */
+  private async enrichListingsWithRelatedData(listings: any[]): Promise<any[]> {
+    if (!listings.length) return [];
+    
+    try {
+      // Extract all unique IDs needed for related data
+      const listingIds = listings.map(listing => listing.id);
+      const provinceIds = [...new Set(listings.map(listing => listing.province_id).filter(Boolean))];
+      const cityIds = [...new Set(listings.map(listing => listing.city_id).filter(Boolean))];
+      const districtIds = [...new Set(listings.map(listing => listing.district_id).filter(Boolean))];
+      const userIds = [...new Set(listings.map(listing => listing.user_id).filter(Boolean))];
+      
+      // Fetch all media for these listings
+      const { data: allMedia } = await supabase
+        .from('property_media')
+        .select('listing_id, media_url, is_primary')
+        .in('listing_id', listingIds);
+      
+      // Fetch all locations in one query
+      const { data: allLocations } = await supabase
+        .from('locations')
+        .select('id, name, type')
+        .in('id', [...provinceIds, ...cityIds, ...districtIds]);
+      
+      // Fetch all user profiles in one query
+      const { data: allUsers } = await supabase
+        .from('user_profiles')
+        .select('id, full_name, phone, company, avatar_url')
+        .in('id', userIds);
+      
+      // Create lookup maps for quick access
+      const mediaByListingId = new Map();
+      if (allMedia) {
+        allMedia.forEach(media => {
+          if (!mediaByListingId.has(media.listing_id)) {
+            mediaByListingId.set(media.listing_id, []);
+          }
+          mediaByListingId.get(media.listing_id).push(media);
+        });
+      }
+      
+      const locationsById = new Map();
+      if (allLocations) {
+        allLocations.forEach(location => {
+          locationsById.set(location.id, location);
+        });
+      }
+      
+      const usersById = new Map();
+      if (allUsers) {
+        allUsers.forEach(user => {
+          usersById.set(user.id, user);
+        });
+      }
+      
+      // Enrich each listing with its related data
+      return listings.map(listing => {
+        // Add media
+        const media = mediaByListingId.get(listing.id) || [];
+        
+        // Add location names
+        const province = locationsById.get(listing.province_id);
+        const city = locationsById.get(listing.city_id);
+        const district = locationsById.get(listing.district_id);
+        
+        // Add user profile
+        const userProfile = usersById.get(listing.user_id);
+        
+        return {
+          ...listing,
+          property_media: media,
+          province: province ? { name: province.name } : null,
+          city: city ? { name: city.name } : null,
+          district: district ? { name: district.name } : null,
+          user_profile: userProfile
+        };
+      });
+    } catch (error) {
+      console.error('Error enriching listings with related data:', error);
+      return listings; // Return original listings if enrichment fails
+    }
+  }
+
+  /**
+   * Enrich a single listing with related data
+   */
+  private async enrichListingWithRelatedData(listing: any): Promise<any> {
+    try {
+      // Fetch property media
+      const { data: media } = await supabase
+        .from('property_media')
+        .select('media_url, is_primary')
+        .eq('listing_id', listing.id);
+      
+      // Fetch location data
+      const locationIds = [listing.province_id, listing.city_id, listing.district_id].filter(Boolean);
+      const { data: locations } = await supabase
+        .from('locations')
+        .select('id, name, type')
+        .in('id', locationIds);
+      
+      // Fetch user profile
+      const { data: userProfile } = await supabase
+        .from('user_profiles')
+        .select('id, full_name, phone, company, avatar_url')
+        .eq('id', listing.user_id)
+        .single();
+      
+      // Map locations to their respective fields
+      const province = locations?.find(loc => loc.id === listing.province_id);
+      const city = locations?.find(loc => loc.id === listing.city_id);
+      const district = locations?.find(loc => loc.id === listing.district_id);
+      
+      return {
+        ...listing,
+        property_media: media || [],
+        province: province ? { name: province.name } : null,
+        city: city ? { name: city.name } : null,
+        district: district ? { name: district.name } : null,
+        user_profile: userProfile
+      };
+    } catch (error) {
+      console.error('Error enriching listing with related data:', error);
+      return listing; // Return original listing if enrichment fails
+    }
+  }
+
+  /**
+   * Enrich listings with just location data (for user listings)
+   */
+  private async enrichListingsWithLocationData(listings: any[]): Promise<any[]> {
+    if (!listings.length) return [];
+    
+    try {
+      // Extract all unique location IDs
+      const provinceIds = [...new Set(listings.map(listing => listing.province_id).filter(Boolean))];
+      const cityIds = [...new Set(listings.map(listing => listing.city_id).filter(Boolean))];
+      
+      // Fetch all locations in one query
+      const { data: allLocations } = await supabase
+        .from('locations')
+        .select('id, name, type')
+        .in('id', [...provinceIds, ...cityIds]);
+      
+      // Create lookup map for quick access
+      const locationsById = new Map();
+      if (allLocations) {
+        allLocations.forEach(location => {
+          locationsById.set(location.id, location);
+        });
+      }
+      
+      // Enrich each listing with location data
+      return listings.map(listing => {
+        const province = locationsById.get(listing.province_id);
+        const city = locationsById.get(listing.city_id);
+        
+        return {
+          ...listing,
+          province: province ? { name: province.name } : null,
+          city: city ? { name: city.name } : null
+        };
+      });
+    } catch (error) {
+      console.error('Error enriching listings with location data:', error);
+      return listings; // Return original listings if enrichment fails
+    }
+  }
+
+  /**
    * Upload an image to Supabase Storage
    */
   private async uploadImage(file: File | string, listingId: string): Promise<string> {
@@ -473,86 +700,76 @@ class ListingService {
       status: 'pending', // New listings start as pending
       views: 0,
       inquiries: 0,
-      is_promoted: false
+      is_promoted: false,
+      floors: formData.floors || null
     };
   }
 
   /**
-   * Transform database listing to frontend Property interface
+   * Map database listing response to Property interface (single listing)
    */
-  private async transformListingToProperty(
-    listing: Listing, 
-    media: PropertyMedia[], 
-    userProfile: any
-  ): Promise<Property> {
-    // Get location names
-    const province = provinces.find(p => p.id === listing.province_id)?.name || '';
-    const city = cities.find(c => c.id === listing.city_id)?.name || '';
-    const district = districts.find(d => d.id === listing.district_id)?.name || '';
+  private mapDbListingToProperty(dbListing: any): Property {
+    // Get location names from enriched data
+    const province = dbListing.province?.name || dbListing.province_name || '';
+    const city = dbListing.city?.name || dbListing.city_name || '';
+    const district = dbListing.district?.name || dbListing.district_name || '';
     
-    // Get images
-    const images = media.map(m => m.media_url);
+    // Get images from property_media
+    let images = ['https://images.pexels.com/photos/106399/pexels-photo-106399.jpeg']; // Default image
+    if (dbListing.property_media && dbListing.property_media.length > 0) {
+      images = dbListing.property_media.map((media: any) => media.media_url);
+    }
     
-    // Create agent object
+    // Create agent object with minimal data for listing cards
+    const userProfile = dbListing.user_profile || {};
     const agent = {
-      id: userProfile?.id || listing.user_id,
-      name: userProfile?.full_name || 'Unknown Agent',
-      phone: userProfile?.phone || '',
-      email: userProfile?.email || '',
-      avatar: userProfile?.avatar_url || undefined,
-      company: userProfile?.company || undefined
+      id: dbListing.user_id,
+      name: userProfile.full_name || 'Agent',
+      phone: userProfile.phone || '',
+      email: '', // Email still not included for privacy
+      avatar: userProfile.avatar_url,
+      company: userProfile.company
     };
     
     // Map property type
-    const propertyType = listing.property_type as PropertyType;
+    const propertyType = dbListing.property_type as PropertyType;
     
     return {
-      id: listing.id,
-      title: listing.title,
-      description: listing.description,
-      price: listing.price,
-      priceUnit: listing.price_unit,
+      id: dbListing.id,
+      title: dbListing.title,
+      description: dbListing.description,
+      price: dbListing.price,
+      priceUnit: dbListing.price_unit,
       type: propertyType,
-      purpose: listing.purpose,
-      bedrooms: listing.bedrooms || undefined,
-      bathrooms: listing.bathrooms || undefined,
-      buildingSize: listing.building_size || undefined,
-      landSize: listing.land_size || undefined,
+      purpose: dbListing.purpose,
+      bedrooms: dbListing.bedrooms || undefined,
+      bathrooms: dbListing.bathrooms || undefined,
+      buildingSize: dbListing.building_size || undefined,
+      landSize: dbListing.land_size || undefined,
+      floors: dbListing.floors || undefined,
       location: {
         province,
         city,
         district,
-        address: listing.address || '',
-        postalCode: listing.postal_code || undefined
+        address: dbListing.address || '',
+        postalCode: dbListing.postal_code || undefined
       },
-      images: images.length > 0 ? images : ['https://images.pexels.com/photos/106399/pexels-photo-106399.jpeg'],
-      features: listing.features || [],
+      images,
+      features: dbListing.features || [],
       agent,
-      createdAt: listing.created_at,
-      isPromoted: listing.is_promoted,
-      status: listing.status as ListingStatus,
-      views: listing.views,
-      inquiries: listing.inquiries
+      createdAt: dbListing.created_at,
+      isPromoted: dbListing.is_promoted,
+      status: dbListing.status as ListingStatus,
+      views: dbListing.views,
+      inquiries: dbListing.inquiries
     };
   }
 
   /**
-   * Transform multiple database listings to frontend Property interface
+   * Map database listings response to Property interface (multiple listings)
    */
-  private async transformListingsToProperties(listings: any[]): Promise<Property[]> {
-    return Promise.all(listings.map(async (listing) => {
-      // Get user profile
-      const { data: userProfile } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', listing.user_id)
-        .single();
-      
-      // Get media
-      const media = listing.property_media || [];
-      
-      return this.transformListingToProperty(listing, media, userProfile);
-    }));
+  private mapDbListingsToProperties(dbListings: any[]): Property[] {
+    return dbListings.map(listing => this.mapDbListingToProperty(listing));
   }
 }
 

@@ -108,6 +108,14 @@ export interface PaymentData {
   status: 'pending' | 'success' | 'failed' | 'cancelled';
   /** Payment method used */
   paymentMethod: string;
+  /** Xendit invoice ID */
+  xenditInvoiceId?: string;
+  /** Xendit payment method */
+  xenditPaymentMethod?: string;
+  /** Xendit payment channel */
+  xenditPaymentChannel?: string;
+  /** Xendit callback data */
+  xenditCallbackData?: any;
   /** Transaction identifier (optional) */
   transactionId?: string;
   /** Midtrans token (optional) */

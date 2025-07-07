@@ -1,33 +1,96 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, MapPin, Bed, Bath, Move } from 'lucide-react';
+import { 
+  Heart, 
+  MapPin, 
+  Bed, 
+  Bath, 
+  Move, 
+  Home,
+  Star,
+  Car,
+  Droplets,
+  Trees,
+  Tv,
+  Utensils,
+  Briefcase,
+  Sun,
+  Shield,
+  LayoutGrid
+} from 'lucide-react';
 import { Property } from '../../types';
 import { formatPrice } from '../../utils/formatter';
 import { premiumService } from '../../services/premiumService';
 import PremiumPropertyCard from '../premium/PremiumPropertyCard';
+import { getFeatureLabelById } from '../../types/listing';
 
 interface PropertyCardProps {
   property: Property;
 }
+
+// Feature icon mapping
+const featureIcons: Record<string, React.ElementType> = {
+  // Parking
+  garage: Car,
+  carport: Car,
+  street_parking: Car,
+  
+  // Outdoor spaces
+  garden: Trees,
+  patio: Trees,
+  balcony: Trees,
+  swimming_pool: Droplets,
+  
+  // Security
+  cctv: Shield,
+  gated_community: Shield,
+  security_system: Shield,
+  
+  // Interior amenities
+  air_conditioning: Sun,
+  built_in_wardrobes: Home,
+  storage: Home,
+  
+  // Kitchen features
+  modern_appliances: Utensils,
+  kitchen_island: Utensils,
+  pantry: Utensils,
+  
+  // Additional rooms
+  study: Briefcase,
+  home_office: Briefcase,
+  entertainment_room: Tv,
+  
+  // Layout options
+  open_floor_plan: LayoutGrid,
+  separate_dining: LayoutGrid,
+  master_bedroom_downstairs: Bed,
+  modern_kitchen: Utensils,
+  
+  // Utilities
+  solar_panels: Sun,
+  water_tank: Droplets,
+  backup_generator: Home
+};
 
 const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
   const [premiumListing, setPremiumListing] = React.useState<any>(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
   React.useEffect(() => {
-    const checkPremiumStatus = async () => {
-      try {
-        const premium = await premiumService.getPremiumListing(property.id);
-        setPremiumListing(premium);
-      } catch (error) {
-        console.error('Error checking premium status:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     checkPremiumStatus();
-  }, [property.id]);
+  }, []);
+
+  const checkPremiumStatus = async () => {
+    try {
+      const premium = await premiumService.getPremiumListing(property.id);
+      setPremiumListing(premium);
+    } catch (error) {
+      console.error('Error checking premium status:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleAnalyticsUpdate = (type: 'view' | 'inquiry' | 'favorite') => {
     if (premiumListing) {
@@ -58,8 +121,17 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
     bedrooms,
     bathrooms,
     buildingSize,
+    floors,
     images,
+    features,
+    views,
+    description
   } = property;
+
+  // Get up to 3 featured amenities to display as icons
+  const featuredAmenities = features
+    .filter(feature => featureIcons[feature])
+    .slice(0, 3);
 
   return (
     <div className="card group">
@@ -70,6 +142,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
             src={images[0]}
             alt={title}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            loading="lazy"
           />
         </Link>
         <div className="absolute top-2 right-2 z-10">
@@ -91,20 +164,45 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
       <div className="p-4">
         <div className="mb-2">
           <span className="text-xs text-neutral-500 uppercase">
-            {type === 'rumah' ? 'Rumah' : 
-             type === 'apartemen' ? 'Apartemen' : 
-             type === 'ruko' ? 'Ruko' : 
-             type === 'tanah' ? 'Tanah' : 'Properti'}
+            {type === 'rumah' ? 'House' : 
+             type === 'apartemen' ? 'Apartment' : 
+             type === 'kondominium' ? 'Condominium' : 
+             type === 'ruko' ? 'Shop House' : 
+             type === 'tanah' ? 'Land' : 
+             type === 'gedung_komersial' ? 'Commercial' : 
+             type === 'ruang_industri' ? 'Industrial' : 'Property'}
           </span>
         </div>
-        <h3 className="font-heading font-semibold text-lg mb-1 truncate">
+        <h3 className="font-heading font-semibold text-lg mb-1 line-clamp-2 h-14">
           <Link to={`/properti/${id}`} className="hover:text-primary transition-colors">
             {title}
           </Link>
         </h3>
+        
         <p className="text-primary font-heading font-bold text-lg mb-3">
           {formatPrice(price, priceUnit)}
           {purpose === 'sewa' && <span className="text-sm font-normal text-neutral-500">/bulan</span>}
+        </p>
+
+        {/* Rating (using views as a proxy for popularity) */}
+        <div className="flex items-center mb-2">
+          {Array.from({ length: 5 }).map((_, index) => {
+            // Calculate a "rating" based on views (1-5 stars)
+            const rating = Math.min(5, Math.max(3, Math.floor(views / 100) + 3));
+            return (
+              <Star 
+                key={index} 
+                size={14} 
+                className={index < rating ? "text-yellow-500 fill-current" : "text-neutral-300"} 
+              />
+            );
+          })}
+          <span className="text-xs text-neutral-500 ml-1">({views} views)</span>
+        </div>
+
+        {/* Brief description */}
+        <p className="text-sm text-neutral-600 mb-3 line-clamp-2 h-10">
+          {description?.substring(0, 100)}...
         </p>
 
         <div className="flex items-center text-neutral-500 text-sm mb-3">
@@ -115,7 +213,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
         </div>
 
         {/* Features */}
-        <div className="flex justify-between text-neutral-700 border-t border-neutral-200 pt-3">
+        <div className="flex justify-between text-neutral-700 border-t border-neutral-200 pt-3 flex-wrap gap-2">
           {bedrooms !== undefined && (
             <div className="flex items-center">
               <Bed size={16} className="mr-1" />
@@ -136,7 +234,29 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
               <span className="text-sm">{buildingSize} m²</span>
             </div>
           )}
+          
+          {floors !== undefined && (
+            <div className="flex items-center">
+              <Home size={16} className="mr-1" />
+              <span className="text-sm">{floors} floor{floors > 1 ? 's' : ''}</span>
+            </div>
+          )}
         </div>
+        
+        {/* Featured Amenities */}
+        {featuredAmenities.length > 0 && (
+          <div className="flex flex-wrap justify-start gap-3 mt-3 pt-2 border-t border-neutral-200">
+            {featuredAmenities.map((feature, index) => {
+              const Icon = featureIcons[feature];
+              return (
+                <div key={index} className="flex items-center text-neutral-600" title={getFeatureLabelById(feature)}>
+                  <Icon size={14} className="mr-1" />
+                  <span className="text-xs">{getFeatureLabelById(feature)}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

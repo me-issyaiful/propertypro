@@ -7,6 +7,7 @@ import HomePage from './pages/HomePage';
 import PropertyListingPage from './pages/PropertyListingPage';
 import PropertyDetailPage from './pages/PropertyDetailPage';
 import LoginPage from './pages/LoginPage';
+import LocationDetailPage from './pages/LocationDetailPage';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
@@ -15,6 +16,10 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import PremiumUpgradePage from './pages/PremiumUpgradePage';
 import PremiumDashboardPage from './pages/PremiumDashboardPage';
 import PremiumFeaturesPage from './pages/PremiumFeaturesPage';
+
+// Payment Pages
+import PaymentSuccessPage from './pages/payment/PaymentSuccessPage';
+import PaymentFailurePage from './pages/payment/PaymentFailurePage';
 
 // User Dashboard Pages
 import DashboardLayout from './components/dashboard/DashboardLayout';
@@ -56,6 +61,7 @@ function App() {
               <Route path="/" element={<HomePage />} />
               <Route path="/jual" element={<PropertyListingPage />} />
               <Route path="/sewa" element={<PropertyListingPage />} />
+              <Route path="/lokasi/:locationSlug" element={<LocationDetailPage />} />
               <Route path="/properti/:id" element={<PropertyDetailPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
@@ -65,6 +71,10 @@ function App() {
               {/* Premium Routes */}
               <Route path="/premium/upgrade" element={<PremiumUpgradePage />} />
               <Route path="/premium/features" element={<PremiumFeaturesPage />} />
+              
+              {/* Payment Routes */}
+              <Route path="/payment/success" element={<PaymentSuccessPage />} />
+              <Route path="/payment/failure" element={<PaymentFailurePage />} />
 
               {/* User Dashboard Routes */}
               <Route path="/dashboard" element={

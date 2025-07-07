@@ -8,7 +8,13 @@ import {
   Crown,
   MapPin,
   Home,
-  DollarSign
+  DollarSign,
+  Bed,
+  Bath,
+  Move,
+  Check,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 import { provinces, cities, districts } from '../../data/locations';
@@ -16,6 +22,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { ListingFormData } from '../../types/listing';
 import { listingService } from '../../services/listingService';
+import { PROPERTY_FEATURES, getAllPropertyFeatures } from '../../types/listing';
 
 const AddEditListing: React.FC = () => {
   const { id } = useParams();
@@ -28,6 +35,7 @@ const AddEditListing: React.FC = () => {
   const [filteredCities, setFilteredCities] = useState(cities);
   const [filteredDistricts, setFilteredDistricts] = useState(districts);
   const [newFeature, setNewFeature] = useState('');
+  const [showFeatureCategories, setShowFeatureCategories] = useState<Record<string, boolean>>({});
 
   const [formData, setFormData] = useState<ListingFormData>({
     title: '',
@@ -46,7 +54,8 @@ const AddEditListing: React.FC = () => {
     address: '',
     features: [],
     images: [],
-    makePremium: false
+    makePremium: false,
+    floors: 1
   });
 
   useEffect(() => {
@@ -54,6 +63,13 @@ const AddEditListing: React.FC = () => {
       // Load existing listing data
       fetchListing(id);
     }
+    
+    // Initialize feature categories as expanded
+    const initialCategoryState: Record<string, boolean> = {};
+    PROPERTY_FEATURES.forEach(category => {
+      initialCategoryState[category.name] = true;
+    });
+    setShowFeatureCategories(initialCategoryState);
   }, [isEdit, id]);
 
   const fetchListing = async (listingId: string) => {
@@ -88,7 +104,8 @@ const AddEditListing: React.FC = () => {
         address: property.location.address,
         features: property.features,
         images: property.images,
-        makePremium: false
+        makePremium: false,
+        floors: property.floors || 1
       });
     } catch (error) {
       console.error('Error fetching listing:', error);
@@ -120,7 +137,7 @@ const AddEditListing: React.FC = () => {
 
   const handleInputChange = (field: keyof ListingFormData, value: any) => {
     // Convert numeric string inputs to numbers
-    if (['price', 'bedrooms', 'bathrooms', 'buildingSize', 'landSize'].includes(field)) {
+    if (['price', 'bedrooms', 'bathrooms', 'buildingSize', 'landSize', 'floors'].includes(field)) {
       const numValue = value === '' ? 0 : parseFloat(value);
       setFormData(prev => ({ ...prev, [field]: numValue }));
     } else {
@@ -164,6 +181,30 @@ const AddEditListing: React.FC = () => {
     setFormData(prev => ({
       ...prev,
       features: prev.features.filter(f => f !== feature)
+    }));
+  };
+  
+  const toggleFeature = (featureId: string) => {
+    setFormData(prev => {
+      const features = [...prev.features];
+      if (features.includes(featureId)) {
+        return {
+          ...prev,
+          features: features.filter(id => id !== featureId)
+        };
+      } else {
+        return {
+          ...prev,
+          features: [...features, featureId]
+        };
+      }
+    });
+  };
+  
+  const toggleFeatureCategory = (categoryName: string) => {
+    setShowFeatureCategories(prev => ({
+      ...prev,
+      [categoryName]: !prev[categoryName]
     }));
   };
 
@@ -434,6 +475,20 @@ const AddEditListing: React.FC = () => {
                 min="0"
               />
             </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">
+                Jumlah Lantai
+              </label>
+              <input
+                type="number"
+                className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50"
+                value={formData.floors || ''}
+                onChange={(e) => handleInputChange('floors', e.target.value)}
+                placeholder="1"
+                min="1"
+              />
+            </div>
           </div>
         </div>
 
@@ -519,7 +574,47 @@ const AddEditListing: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-lg font-semibold text-neutral-900 mb-4">Fasilitas & Fitur</h2>
           
+          {/* Predefined Features */}
+          <div className="mb-6">
+            <h3 className="font-medium text-neutral-700 mb-3">Pilih Fasilitas</h3>
+            <div className="space-y-4">
+              {PROPERTY_FEATURES.map((category, categoryIndex) => (
+                <div key={categoryIndex} className="border rounded-lg overflow-hidden">
+                  <button
+                    type="button"
+                    className="flex items-center justify-between w-full p-3 bg-neutral-50 text-left"
+                    onClick={() => toggleFeatureCategory(category.name)}
+                  >
+                    <span className="font-medium">{category.name}</span>
+                    {showFeatureCategories[category.name] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
+                  
+                  {showFeatureCategories[category.name] && (
+                    <div className="p-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                      {category.features.map((feature, featureIndex) => (
+                        <div key={featureIndex} className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id={`feature-${feature.id}`}
+                            checked={formData.features.includes(feature.id)}
+                            onChange={() => toggleFeature(feature.id)}
+                            className="h-4 w-4 text-primary border-neutral-300 rounded focus:ring-primary"
+                          />
+                          <label htmlFor={`feature-${feature.id}`} className="ml-2 text-sm text-neutral-700">
+                            {feature.label}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {/* Custom Features */}
           <div className="mb-4">
+            <h3 className="font-medium text-neutral-700 mb-3">Tambah Fasilitas Kustom</h3>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -539,23 +634,31 @@ const AddEditListing: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {formData.features.map((feature, index) => (
-              <span
-                key={index}
-                className="inline-flex items-center px-3 py-1 bg-neutral-100 text-neutral-700 rounded-full text-sm"
-              >
-                {feature}
-                <button
-                  type="button"
-                  onClick={() => removeFeature(feature)}
-                  className="ml-2 text-neutral-500 hover:text-red-500"
-                >
-                  <X size={14} />
-                </button>
-              </span>
-            ))}
-          </div>
+          {/* Selected Custom Features */}
+          {formData.features.filter(f => !getAllPropertyFeatures().some(pf => pf.id === f)).length > 0 && (
+            <div className="mb-4">
+              <h3 className="font-medium text-neutral-700 mb-2">Fasilitas Kustom</h3>
+              <div className="flex flex-wrap gap-2">
+                {formData.features
+                  .filter(f => !getAllPropertyFeatures().some(pf => pf.id === f))
+                  .map((feature, index) => (
+                    <span
+                      key={index}
+                      className="inline-flex items-center px-3 py-1 bg-neutral-100 text-neutral-700 rounded-full text-sm"
+                    >
+                      {feature}
+                      <button
+                        type="button"
+                        onClick={() => removeFeature(feature)}
+                        className="ml-2 text-neutral-500 hover:text-red-500"
+                      >
+                        <X size={14} />
+                      </button>
+                    </span>
+                  ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Images */}

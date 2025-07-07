@@ -12,6 +12,9 @@ import {
 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '../../contexts/AuthContext';
+import { listingService } from '../../services/listingService';
+import { premiumService } from '../../services/premiumService';
+import { useToast } from '../../contexts/ToastContext';
 
 interface DashboardStats {
   totalListings: number;
@@ -29,6 +32,7 @@ interface DashboardStats {
 
 const DashboardOverview: React.FC = () => {
   const { user } = useAuth();
+  const { showError } = useToast();
   const [stats, setStats] = useState<DashboardStats>({
     totalListings: 0,
     activeListings: 0,
@@ -40,38 +44,97 @@ const DashboardOverview: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate loading user stats
-    setTimeout(() => {
+    if (user) {
+      fetchDashboardStats();
+    }
+  }, [user]);
+
+  const fetchDashboardStats = async () => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    try {
+      // Get user's listings
+      const userListings = await listingService.getUserListings(user.id);
+      
+      // Calculate stats
+      const totalListings = userListings.length;
+      const activeListings = userListings.filter(l => l.status === 'active').length;
+      const expiredListings = userListings.filter(l => l.status === 'expired').length;
+      const totalViews = userListings.reduce((sum, listing) => sum + listing.views, 0);
+      
+      // Get premium listings
+      const premiumListings = await premiumService.getUserPremiumListings(user.id);
+      const activePremiumListings = premiumListings.filter(l => l.status === 'active').length;
+      
+      // Generate recent activity
+      const recentActivity = [];
+      
+      // Add recent listings (newest first)
+      const recentListings = [...userListings]
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 3);
+        
+      for (const listing of recentListings) {
+        recentActivity.push({
+          id: `listing-${listing.id}`,
+          type: 'listing_created' as const,
+          message: `Iklan "${listing.title}" berhasil dipublikasi`,
+          date: listing.createdAt
+        });
+      }
+      
+      // Add premium upgrades
+      const recentPremium = [...premiumListings]
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 2);
+        
+      for (const premium of recentPremium) {
+        // Get property title
+        const property = userListings.find(l => l.id === premium.propertyId);
+        if (property) {
+          recentActivity.push({
+            id: `premium-${premium.id}`,
+            type: 'premium_upgraded' as const,
+            message: `Iklan "${property.title}" ditingkatkan ke Premium`,
+            date: premium.createdAt
+          });
+        }
+      }
+      
+      // Add expired listings
+      const recentExpired = userListings
+        .filter(l => l.status === 'expired')
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 2);
+        
+      for (const listing of recentExpired) {
+        recentActivity.push({
+          id: `expired-${listing.id}`,
+          type: 'listing_expired' as const,
+          message: `Iklan "${listing.title}" telah kedaluwarsa`,
+          date: listing.createdAt // In a real app, you'd use the expiry date
+        });
+      }
+      
+      // Sort all activities by date
+      recentActivity.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      
       setStats({
-        totalListings: 12,
-        activeListings: 8,
-        premiumListings: 2,
-        expiredListings: 4,
-        totalViews: 1247,
-        recentActivity: [
-          {
-            id: '1',
-            type: 'listing_created',
-            message: 'Iklan "Rumah Minimalis Jakarta" berhasil dipublikasi',
-            date: '2024-01-15T10:30:00Z'
-          },
-          {
-            id: '2',
-            type: 'premium_upgraded',
-            message: 'Iklan "Apartemen Kemang" ditingkatkan ke Premium',
-            date: '2024-01-14T15:20:00Z'
-          },
-          {
-            id: '3',
-            type: 'listing_expired',
-            message: 'Iklan "Ruko Bandung" telah kedaluwarsa',
-            date: '2024-01-13T09:15:00Z'
-          }
-        ]
+        totalListings,
+        activeListings,
+        premiumListings: activePremiumListings,
+        expiredListings,
+        totalViews,
+        recentActivity: recentActivity.slice(0, 5) // Take top 5
       });
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+      showError('Error', 'Failed to load dashboard statistics. Please try again.');
+    } finally {
       setIsLoading(false);
-    }, 1000);
-  }, []);
+    }
+  };
 
   const statCards = [
     {

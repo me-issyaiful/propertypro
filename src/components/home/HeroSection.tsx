@@ -1,7 +1,72 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import SearchBox from '../common/SearchBox';
+import { supabase } from '../../lib/supabase';
+
+interface Stats {
+  totalProperties: number;
+  totalProvinces: number;
+  totalAgents: number;
+  totalUsers: number;
+}
 
 const HeroSection: React.FC = () => {
+  const [stats, setStats] = useState<Stats>({
+    totalProperties: 0,
+    totalProvinces: 0,
+    totalAgents: 0,
+    totalUsers: 0
+  });
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const fetchStats = async () => {
+    setIsLoading(true);
+    try {
+      // Get total properties count
+      const { count: propertiesCount } = await supabase
+        .from('listings')
+        .select('*', { count: 'exact', head: true });
+      
+      // Get total provinces count
+      const { count: provincesCount } = await supabase
+        .from('locations')
+        .select('*', { count: 'exact', head: true })
+        .eq('type', 'provinsi');
+      
+      // Get total agents count
+      const { count: agentsCount } = await supabase
+        .from('user_profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('role', 'agent');
+      
+      // Get total users count
+      const { count: usersCount } = await supabase
+        .from('user_profiles')
+        .select('*', { count: 'exact', head: true });
+      
+      setStats({
+        totalProperties: propertiesCount || 0,
+        totalProvinces: provincesCount || 0,
+        totalAgents: agentsCount || 0,
+        totalUsers: usersCount || 0
+      });
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+      // Use fallback values if there's an error
+      setStats({
+        totalProperties: 10000,
+        totalProvinces: 34,
+        totalAgents: 500,
+        totalUsers: 15000
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <section className="relative">
       {/* Hero Image */}
@@ -34,19 +99,27 @@ const HeroSection: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
-              <p className="font-heading font-bold text-2xl text-primary">10,000+</p>
+              <p className="font-heading font-bold text-2xl text-primary">
+                {isLoading ? '...' : stats.totalProperties.toLocaleString()}+
+              </p>
               <p className="text-neutral-600 text-sm">Properti Tersedia</p>
             </div>
             <div className="text-center">
-              <p className="font-heading font-bold text-2xl text-primary">34</p>
+              <p className="font-heading font-bold text-2xl text-primary">
+                {isLoading ? '...' : stats.totalProvinces}
+              </p>
               <p className="text-neutral-600 text-sm">Provinsi</p>
             </div>
             <div className="text-center">
-              <p className="font-heading font-bold text-2xl text-primary">500+</p>
+              <p className="font-heading font-bold text-2xl text-primary">
+                {isLoading ? '...' : stats.totalAgents.toLocaleString()}+
+              </p>
               <p className="text-neutral-600 text-sm">Agen Terpercaya</p>
             </div>
             <div className="text-center">
-              <p className="font-heading font-bold text-2xl text-primary">15,000+</p>
+              <p className="font-heading font-bold text-2xl text-primary">
+                {isLoading ? '...' : stats.totalUsers.toLocaleString()}+
+              </p>
               <p className="text-neutral-600 text-sm">Klien Puas</p>
             </div>
           </div>

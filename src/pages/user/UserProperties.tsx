@@ -17,31 +17,16 @@ import {
 } from 'lucide-react';
 import { formatPrice } from '../../utils/formatter';
 import { useToast } from '../../contexts/ToastContext';
-
-interface Property {
-  id: string;
-  title: string;
-  description: string;
-  price: number;
-  priceUnit: 'juta' | 'miliar';
-  type: string;
-  purpose: 'jual' | 'sewa';
-  location: {
-    city: string;
-    province: string;
-  };
-  images: string[];
-  status: 'active' | 'pending' | 'rejected' | 'expired';
-  views: number;
-  inquiries: number;
-  createdAt: string;
-}
+import { useAuth } from '../../contexts/AuthContext';
+import { listingService } from '../../services/listingService';
+import { UserListing } from '../../types/listing';
 
 const UserProperties: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { showSuccess, showError } = useToast();
-  const [properties, setProperties] = useState<Property[]>([]);
-  const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
+  const [properties, setProperties] = useState<UserListing[]>([]);
+  const [filteredProperties, setFilteredProperties] = useState<UserListing[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -58,98 +43,24 @@ const UserProperties: React.FC = () => {
   const [propertyToDelete, setPropertyToDelete] = useState<string | null>(null);
   
   useEffect(() => {
-    getPropertyList();
-  }, []);
+    if (user) {
+      getPropertyList();
+    }
+  }, [user]);
   
   useEffect(() => {
     applyFilters();
   }, [properties, searchTerm, statusFilter, typeFilter, sortBy]);
   
   const getPropertyList = async () => {
+    if (!user) return;
+    
     setIsLoading(true);
     setError(null);
     
     try {
-      // In a real implementation, this would be an API call
-      // For now, we'll simulate with mock data
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const mockProperties: Property[] = [
-        {
-          id: '1',
-          title: 'Modern Apartment in Jakarta',
-          description: 'Beautiful apartment with city view',
-          price: 800,
-          priceUnit: 'juta',
-          type: 'apartemen',
-          purpose: 'jual',
-          location: {
-            city: 'Jakarta',
-            province: 'DKI Jakarta'
-          },
-          images: ['https://images.pexels.com/photos/1643383/pexels-photo-1643383.jpeg'],
-          status: 'active',
-          views: 423,
-          inquiries: 12,
-          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString() // 5 days ago
-        },
-        {
-          id: '2',
-          title: 'Family House in Bandung',
-          description: 'Spacious family house with garden',
-          price: 2.5,
-          priceUnit: 'miliar',
-          type: 'rumah',
-          purpose: 'jual',
-          location: {
-            city: 'Bandung',
-            province: 'Jawa Barat'
-          },
-          images: ['https://images.pexels.com/photos/106399/pexels-photo-106399.jpeg'],
-          status: 'active',
-          views: 287,
-          inquiries: 8,
-          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString() // 10 days ago
-        },
-        {
-          id: '3',
-          title: 'Luxury Villa in Bali',
-          description: 'Luxury villa with private pool',
-          price: 5,
-          priceUnit: 'miliar',
-          type: 'villa',
-          purpose: 'jual',
-          location: {
-            city: 'Denpasar',
-            province: 'Bali'
-          },
-          images: ['https://images.pexels.com/photos/32870/pexels-photo.jpg'],
-          status: 'pending',
-          views: 156,
-          inquiries: 4,
-          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString() // 2 days ago
-        },
-        {
-          id: '4',
-          title: 'Office Space in Jakarta',
-          description: 'Modern office space in business district',
-          price: 15,
-          priceUnit: 'juta',
-          type: 'kantor',
-          purpose: 'sewa',
-          location: {
-            city: 'Jakarta',
-            province: 'DKI Jakarta'
-          },
-          images: ['https://images.pexels.com/photos/269077/pexels-photo-269077.jpeg'],
-          status: 'expired',
-          views: 89,
-          inquiries: 2,
-          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30).toISOString() // 30 days ago
-        }
-      ];
-      
-      setProperties(mockProperties);
+      const userListings = await listingService.getUserListings(user.id);
+      setProperties(userListings);
     } catch (err) {
       console.error('Error fetching properties:', err);
       setError('Failed to load properties. Please try again later.');
@@ -215,18 +126,19 @@ const UserProperties: React.FC = () => {
   };
   
   const deleteProperty = async () => {
-    if (!propertyToDelete) return;
+    if (!propertyToDelete || !user) return;
     
     setIsLoading(true);
     
     try {
-      // In a real implementation, this would be an API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const success = await listingService.deleteListing(propertyToDelete, user.id);
       
-      // Remove the property from the list
-      setProperties(prev => prev.filter(p => p.id !== propertyToDelete));
-      
-      showSuccess('Property deleted successfully', 'The property has been removed from your listings.');
+      if (success) {
+        setProperties(prev => prev.filter(p => p.id !== propertyToDelete));
+        showSuccess('Property deleted successfully', 'The property has been removed from your listings.');
+      } else {
+        throw new Error('Failed to delete property');
+      }
     } catch (err) {
       console.error('Error deleting property:', err);
       showError('Failed to delete property', 'Please try again.');
@@ -253,16 +165,16 @@ const UserProperties: React.FC = () => {
             Pending
           </span>
         );
-      case 'rejected':
+      case 'inactive':
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
             <AlertCircle size={12} className="mr-1" />
-            Rejected
+            Inactive
           </span>
         );
       case 'expired':
         return (
-          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
             <AlertCircle size={12} className="mr-1" />
             Expired
           </span>
@@ -276,6 +188,24 @@ const UserProperties: React.FC = () => {
     return (
       <div className="bg-white rounded-lg shadow-md p-8 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+  
+  if (error) {
+    return (
+      <div className="bg-white rounded-lg shadow-md p-8">
+        <div className="flex items-center text-red-600 mb-4">
+          <AlertCircle size={24} className="mr-2" />
+          <h2 className="text-xl font-semibold">Error</h2>
+        </div>
+        <p className="text-neutral-700">{error}</p>
+        <button 
+          onClick={getPropertyList}
+          className="mt-4 btn-primary"
+        >
+          Try Again
+        </button>
       </div>
     );
   }
@@ -297,7 +227,7 @@ const UserProperties: React.FC = () => {
             </p>
           </div>
           
-          <Link to="/user/properties/add" className="btn-primary flex items-center justify-center">
+          <Link to="/dashboard/listings/new" className="btn-primary flex items-center justify-center">
             <Plus size={18} className="mr-2" />
             Add New Property
           </Link>
@@ -367,7 +297,7 @@ const UserProperties: React.FC = () => {
                   <option value="all">All Statuses</option>
                   <option value="active">Active</option>
                   <option value="pending">Pending</option>
-                  <option value="rejected">Rejected</option>
+                  <option value="inactive">Inactive</option>
                   <option value="expired">Expired</option>
                 </select>
               </div>
@@ -420,9 +350,10 @@ const UserProperties: React.FC = () => {
                 <div key={property.id} className="bg-white rounded-lg shadow-md overflow-hidden">
                   <div className="relative h-48">
                     <img
-                      src={property.images[0]}
+                      src={property.image}
                       alt={property.title}
                       className="w-full h-full object-cover"
+                      loading="lazy"
                     />
                     <div className="absolute top-2 right-2">
                       {getStatusBadge(property.status)}
@@ -506,9 +437,10 @@ const UserProperties: React.FC = () => {
                           <div className="flex items-center">
                             <div className="w-12 h-12 rounded overflow-hidden mr-3 flex-shrink-0">
                               <img
-                                src={property.images[0]}
+                                src={property.image}
                                 alt={property.title}
                                 className="w-full h-full object-cover"
+                                loading="lazy"
                               />
                             </div>
                             <div>
@@ -587,7 +519,7 @@ const UserProperties: React.FC = () => {
                 ? 'Try changing your search criteria or filters'
                 : 'Add your first property to get started'}
             </p>
-            <Link to="/user/properties/add" className="btn-primary">
+            <Link to="/dashboard/listings/new" className="btn-primary">
               Add Your First Property
             </Link>
           </div>

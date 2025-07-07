@@ -81,13 +81,7 @@ const AdminDashboard: React.FC = () => {
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
-      // Use fallback data
-      setStats({
-        totalUsers: 12543,
-        activeProperties: 8921,
-        transactions: 1234,
-        pendingReports: 45
-      });
+      throw error;
     }
   };
 
@@ -103,7 +97,7 @@ const AdminDashboard: React.FC = () => {
       if (error) throw error;
 
       // Map to ActivityItem format
-      const activities: ActivityItem[] = activityLogs.map(log => {
+      const activities: ActivityItem[] = activityLogs.data.map(log => {
         // Format the message based on action and resource
         let message = '';
         switch (log.action) {
@@ -159,27 +153,7 @@ const AdminDashboard: React.FC = () => {
       setRecentActivities(activities);
     } catch (error) {
       console.error('Error fetching recent activities:', error);
-      // Use fallback data
-      setRecentActivities([
-        {
-          id: '1',
-          type: 'user_registered',
-          message: 'Pengguna baru mendaftar: John Doe',
-          time: '5 menit yang lalu',
-        },
-        {
-          id: '2',
-          type: 'property_added',
-          message: 'Properti baru ditambahkan: Rumah Minimalis Jakarta',
-          time: '15 menit yang lalu',
-        },
-        {
-          id: '3',
-          type: 'report_submitted',
-          message: 'Laporan baru diterima untuk properti #1234',
-          time: '1 jam yang lalu',
-        }
-      ]);
+      throw error;
     }
   };
 
@@ -299,8 +273,6 @@ const AdminDashboard: React.FC = () => {
     {
       title: 'Total Pengguna',
       value: stats.totalUsers.toLocaleString(),
-      change: '+12%',
-      changeType: 'positive' as const,
       icon: Users,
       color: 'bg-blue-500',
       textColor: 'text-blue-600',
@@ -309,8 +281,6 @@ const AdminDashboard: React.FC = () => {
     {
       title: 'Properti Aktif',
       value: stats.activeProperties.toLocaleString(),
-      change: '+8%',
-      changeType: 'positive' as const,
       icon: Home,
       color: 'bg-green-500',
       textColor: 'text-green-600',
@@ -319,8 +289,6 @@ const AdminDashboard: React.FC = () => {
     {
       title: 'Transaksi Bulan Ini',
       value: stats.transactions.toLocaleString(),
-      change: '+23%',
-      changeType: 'positive' as const,
       icon: TrendingUp,
       color: 'bg-primary',
       textColor: 'text-primary',
@@ -329,8 +297,6 @@ const AdminDashboard: React.FC = () => {
     {
       title: 'Laporan Pending',
       value: stats.pendingReports.toLocaleString(),
-      change: '-5%',
-      changeType: 'negative' as const,
       icon: AlertTriangle,
       color: 'bg-red-500',
       textColor: 'text-red-600',
@@ -368,11 +334,6 @@ const AdminDashboard: React.FC = () => {
                 <div>
                   <p className="text-sm font-medium text-neutral-600 mb-1">{card.title}</p>
                   <p className="text-2xl font-bold text-neutral-900">{card.value}</p>
-                  <p className={`text-sm ${
-                    card.changeType === 'positive' ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    {card.change} dari bulan lalu
-                  </p>
                 </div>
                 <div className={`w-12 h-12 ${card.color} rounded-lg flex items-center justify-center`}>
                   <Icon size={24} className="text-white" />

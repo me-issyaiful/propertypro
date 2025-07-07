@@ -24,6 +24,10 @@ export interface Property {
   buildingSize?: number;
   /** Size of the land in square meters (optional) */
   landSize?: number;
+  /** Number of floors/levels (optional) */
+  floors?: number;
+  /** Number of floors/levels (optional) */
+  floors?: number;
   /** Location details of the property */
   location: Location;
   /** Array of image URLs for the property */

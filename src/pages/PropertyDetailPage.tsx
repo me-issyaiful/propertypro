@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
-import { properties } from '../data/properties';
+import PropertyMap from '../components/common/PropertyMap';
 import { Property } from '../types';
 import { 
   MapPin, 
@@ -15,29 +15,132 @@ import {
   Home,
   Phone,
   Mail,
-  CheckCircle
+  CheckCircle,
+  Car,
+  Droplets,
+  Trees,
+  Tv,
+  Utensils,
+  Briefcase,
+  Sun,
+  Shield,
+  LayoutGrid
 } from 'lucide-react';
 import { formatPrice } from '../utils/formatter';
 import { Helmet } from 'react-helmet-async';
+import { listingService } from '../services/listingService';
+import { useToast } from '../contexts/ToastContext';
+import { getFeatureLabelById } from '../types/listing';
+
+// Feature icon mapping
+const featureIcons: Record<string, React.ElementType> = {
+  // Parking
+  garage: Car,
+  carport: Car,
+  street_parking: Car,
+  
+  // Outdoor spaces
+  garden: Trees,
+  patio: Trees,
+  balcony: Trees,
+  swimming_pool: Droplets,
+  
+  // Security
+  cctv: Shield,
+  gated_community: Shield,
+  security_system: Shield,
+  
+  // Interior amenities
+  air_conditioning: Sun,
+  built_in_wardrobes: Home,
+  storage: Home,
+  
+  // Kitchen features
+  modern_appliances: Utensils,
+  kitchen_island: Utensils,
+  pantry: Utensils,
+  
+  // Additional rooms
+  study: Briefcase,
+  home_office: Briefcase,
+  entertainment_room: Tv,
+  
+  // Layout options
+  open_floor_plan: LayoutGrid,
+  separate_dining: LayoutGrid,
+  master_bedroom_downstairs: Bed,
+  modern_kitchen: Utensils,
+  
+  // Utilities
+  solar_panels: Sun,
+  water_tank: Droplets,
+  backup_generator: Home
+};
 
 const PropertyDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const { showError } = useToast();
   const [property, setProperty] = useState<Property | null>(null);
   const [activeImage, setActiveImage] = useState<string>('');
   const [isContactFormVisible, setIsContactFormVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [similarProperties, setSimilarProperties] = useState<Property[]>([]);
   
   useEffect(() => {
     if (id) {
-      const foundProperty = properties.find(p => p.id === id);
-      if (foundProperty) {
-        setProperty(foundProperty);
-        setActiveImage(foundProperty.images[0]);
-      }
+      fetchPropertyDetails(id);
     }
     
     // Scroll to top when navigating to a property detail
     window.scrollTo(0, 0);
   }, [id]);
+  
+  const fetchPropertyDetails = async (propertyId: string) => {
+    setIsLoading(true);
+    try {
+      // Fetch property details
+      const propertyData = await listingService.getListingById(propertyId);
+      
+      if (!propertyData) {
+        throw new Error('Property not found');
+      }
+      
+      setProperty(propertyData);
+      setActiveImage(propertyData.images[0]);
+      
+      // Increment view count
+      await listingService.incrementViewCount(propertyId);
+      
+      // Fetch similar properties
+      const { data: similarData } = await listingService.getAllListings({
+        type: propertyData.type,
+        purpose: propertyData.purpose,
+        status: 'active'
+      }, 1, 3);
+      
+      // Filter out the current property
+      const filteredSimilar = similarData.filter(p => p.id !== propertyId);
+      setSimilarProperties(filteredSimilar);
+      
+    } catch (error) {
+      console.error('Error fetching property details:', error);
+      showError('Error', 'Failed to load property details. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-12">
+          <div className="flex justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
   
   if (!property) {
     return (
@@ -54,6 +157,73 @@ const PropertyDetailPage: React.FC = () => {
       </Layout>
     );
   }
+  
+  // Group features by category
+  const groupedFeatures: Record<string, string[]> = {};
+  
+  // Initialize with empty arrays for each category
+  const categories = [
+    'Parking',
+    'Outdoor Spaces',
+    'Security',
+    'Interior Amenities',
+    'Kitchen Features',
+    'Additional Rooms',
+    'Utilities',
+    'Layout Options',
+    'Other'
+  ];
+  
+  categories.forEach(category => {
+    groupedFeatures[category] = [];
+  });
+  
+  // Categorize features
+  property.features.forEach(feature => {
+    let found = false;
+    
+    // Check if it's a predefined feature
+    if (featureIcons[feature]) {
+      // Determine category based on feature ID
+      if (feature.includes('garage') || feature.includes('carport') || feature.includes('parking')) {
+        groupedFeatures['Parking'].push(feature);
+        found = true;
+      } else if (feature.includes('garden') || feature.includes('patio') || feature.includes('balcony') || feature.includes('pool')) {
+        groupedFeatures['Outdoor Spaces'].push(feature);
+        found = true;
+      } else if (feature.includes('cctv') || feature.includes('security') || feature.includes('gated')) {
+        groupedFeatures['Security'].push(feature);
+        found = true;
+      } else if (feature.includes('air') || feature.includes('wardrobe') || feature.includes('storage')) {
+        groupedFeatures['Interior Amenities'].push(feature);
+        found = true;
+      } else if (feature.includes('kitchen') || feature.includes('appliance') || feature.includes('pantry')) {
+        groupedFeatures['Kitchen Features'].push(feature);
+        found = true;
+      } else if (feature.includes('study') || feature.includes('office') || feature.includes('entertainment')) {
+        groupedFeatures['Additional Rooms'].push(feature);
+        found = true;
+      } else if (feature.includes('solar') || feature.includes('water') || feature.includes('generator')) {
+        groupedFeatures['Utilities'].push(feature);
+        found = true;
+      } else if (feature.includes('floor') || feature.includes('dining') || feature.includes('bedroom')) {
+        groupedFeatures['Layout Options'].push(feature);
+        found = true;
+      }
+    }
+    
+    // If not categorized, put in Other
+    if (!found) {
+      groupedFeatures['Other'].push(feature);
+    }
+  });
+  
+  // Remove empty categories
+  Object.keys(groupedFeatures).forEach(category => {
+    if (groupedFeatures[category].length === 0) {
+      delete groupedFeatures[category];
+    }
+  });
   
   return (
     <Layout>
@@ -148,6 +318,7 @@ const PropertyDetailPage: React.FC = () => {
                     src={activeImage} 
                     alt={property.title} 
                     className="w-full h-full object-cover"
+                    loading="lazy"
                   />
                 </div>
                 <div className="p-4 flex gap-2 overflow-x-auto">
@@ -161,6 +332,7 @@ const PropertyDetailPage: React.FC = () => {
                         src={img} 
                         alt={`${property.title} - Gambar ${index + 1}`}
                         className="w-full h-full object-cover"
+                        loading="lazy"
                       />
                     </div>
                   ))}
@@ -192,6 +364,14 @@ const PropertyDetailPage: React.FC = () => {
                     <span className="text-sm text-neutral-500">Luas Tanah</span>
                     <span className="font-semibold">{property.landSize ? `${property.landSize} m²` : '-'}</span>
                   </div>
+                  
+                  {property.floors && (
+                    <div className="flex flex-col items-center justify-center p-4 bg-neutral-50 rounded-lg">
+                      <Home size={24} className="text-primary mb-2" />
+                      <span className="text-sm text-neutral-500">Jumlah Lantai</span>
+                      <span className="font-semibold">{property.floors}</span>
+                    </div>
+                  )}
                 </div>
                 
                 <div className="mb-6">
@@ -201,33 +381,53 @@ const PropertyDetailPage: React.FC = () => {
                   </p>
                 </div>
                 
-                {property.features.length > 0 && (
+                {/* Features by Category */}
+                {Object.keys(groupedFeatures).length > 0 && (
                   <div>
-                    <h3 className="font-heading font-semibold text-lg mb-2">Fasilitas & Fitur</h3>
-                    <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {property.features.map((feature, index) => (
-                        <li key={index} className="flex items-center">
-                          <CheckCircle size={16} className="text-primary mr-2" />
-                          <span>{feature}</span>
-                        </li>
+                    <h3 className="font-heading font-semibold text-lg mb-3">Fasilitas & Fitur</h3>
+                    
+                    <div className="space-y-4">
+                      {Object.entries(groupedFeatures).map(([category, features]) => (
+                        features.length > 0 && (
+                          <div key={category} className="border rounded-lg p-3">
+                            <h4 className="font-medium text-neutral-800 mb-2">{category}</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {features.map((feature, index) => {
+                                const Icon = featureIcons[feature] || CheckCircle;
+                                return (
+                                  <div key={index} className="flex items-center">
+                                    <Icon size={16} className="text-primary mr-2" />
+                                    <span>{getFeatureLabelById(feature) || feature}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )
                       ))}
-                    </ul>
+                    </div>
                   </div>
                 )}
               </div>
               
-              {/* Location */}
+              {/* Location Map */}
               <div className="bg-white rounded-lg shadow-md p-6 mb-6">
                 <h2 className="font-heading font-semibold text-xl mb-4">Lokasi</h2>
-                <div className="bg-neutral-100 h-60 flex items-center justify-center rounded mb-4">
-                  <div className="text-center">
-                    <MapPin size={32} className="mx-auto mb-2 text-primary" />
-                    <p>Peta Lokasi</p>
-                  </div>
-                </div>
-                <p className="text-neutral-700">
-                  <span className="font-medium">Alamat:</span> {property.location.address}, {property.location.district}, {property.location.city}, {property.location.province} {property.location.postalCode && `${property.location.postalCode}`}
-                </p>
+                
+                {/* Property Map Component */}
+                <PropertyMap
+                  propertyId={property.id}
+                  propertyTitle={property.title}
+                  location={{
+                    latitude: property.location.latitude,
+                    longitude: property.location.longitude,
+                    address: property.location.address,
+                    district: property.location.district,
+                    city: property.location.city,
+                    province: property.location.province
+                  }}
+                  searchRadius={2}
+                />
               </div>
             </div>
             
@@ -241,6 +441,7 @@ const PropertyDetailPage: React.FC = () => {
                       src={property.agent.avatar || 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg'} 
                       alt={property.agent.name} 
                       className="w-full h-full object-cover"
+                      loading="lazy"
                     />
                   </div>
                   <div>
@@ -333,18 +534,12 @@ const PropertyDetailPage: React.FC = () => {
               </div>
               
               {/* Similar Properties */}
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <h3 className="font-heading font-semibold text-lg mb-4">Properti Serupa</h3>
-                
-                <div className="space-y-4">
-                  {properties
-                    .filter(p => 
-                      p.id !== property.id && 
-                      p.type === property.type && 
-                      p.purpose === property.purpose
-                    )
-                    .slice(0, 3)
-                    .map(similarProperty => (
+              {similarProperties.length > 0 && (
+                <div className="bg-white rounded-lg shadow-md p-6">
+                  <h3 className="font-heading font-semibold text-lg mb-4">Properti Serupa</h3>
+                  
+                  <div className="space-y-4">
+                    {similarProperties.map(similarProperty => (
                       <Link 
                         key={similarProperty.id} 
                         to={`/properti/${similarProperty.id}`}
@@ -355,6 +550,7 @@ const PropertyDetailPage: React.FC = () => {
                             src={similarProperty.images[0]} 
                             alt={similarProperty.title} 
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            loading="lazy"
                           />
                         </div>
                         <div>
@@ -366,10 +562,10 @@ const PropertyDetailPage: React.FC = () => {
                           </p>
                         </div>
                       </Link>
-                    ))
-                  }
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

@@ -210,8 +210,6 @@ const Analytics: React.FC = () => {
         <MetricCard
           title="Total Listing"
           value={analyticsData.overview.totalListings.toLocaleString()}
-          change={8.5}
-          changeLabel="vs bulan lalu"
           icon={<Home size={24} />}
           color="bg-blue-500"
         />
@@ -219,8 +217,6 @@ const Analytics: React.FC = () => {
         <MetricCard
           title="Total Pengguna"
           value={analyticsData.overview.totalUsers.toLocaleString()}
-          change={12.3}
-          changeLabel="vs bulan lalu"
           icon={<Users size={24} />}
           color="bg-green-500"
         />
@@ -228,8 +224,6 @@ const Analytics: React.FC = () => {
         <MetricCard
           title="Total Views"
           value={analyticsData.overview.totalViews.toLocaleString()}
-          change={15.7}
-          changeLabel="vs bulan lalu"
           icon={<Eye size={24} />}
           color="bg-primary"
         />
@@ -237,8 +231,6 @@ const Analytics: React.FC = () => {
         <MetricCard
           title="Conversion Rate"
           value={`${analyticsData.overview.conversionRate}%`}
-          change={2.1}
-          changeLabel="vs bulan lalu"
           icon={<TrendingUp size={24} />}
           color="bg-purple-500"
         />
@@ -249,8 +241,6 @@ const Analytics: React.FC = () => {
         <MetricCard
           title="Listing Aktif Hari Ini"
           value={analyticsData.activeListingsToday.toLocaleString()}
-          change={5.2}
-          changeLabel="vs kemarin"
           icon={<Calendar size={24} />}
           color="bg-yellow-500"
         />
@@ -258,8 +248,6 @@ const Analytics: React.FC = () => {
         <MetricCard
           title="Listing Aktif Minggu Ini"
           value={analyticsData.activeListingsThisWeek.toLocaleString()}
-          change={8.9}
-          changeLabel="vs minggu lalu"
           icon={<Calendar size={24} />}
           color="bg-indigo-500"
         />

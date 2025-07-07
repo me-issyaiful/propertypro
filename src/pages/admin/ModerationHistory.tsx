@@ -3,7 +3,7 @@ import { Eye, Calendar, User, Filter, Download, Search } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 import DataTable, { Column } from '../../components/admin/DataTable';
 import { ModerationAction } from '../../types/admin';
-import { mockModerationActions } from '../../data/reports';
+import { reportService } from '../../services/reportService';
 
 const ModerationHistory: React.FC = () => {
   const [actions, setActions] = useState<ModerationAction[]>([]);
@@ -12,10 +12,37 @@ const ModerationHistory: React.FC = () => {
   const [filterAction, setFilterAction] = useState<string>('all');
   const [filterAdmin, setFilterAdmin] = useState<string>('all');
   const [filterDateRange, setFilterDateRange] = useState<string>('all');
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    setActions(mockModerationActions);
-  }, []);
+    fetchModerationActions();
+  }, [filterAction, filterAdmin, filterDateRange]);
+
+  const fetchModerationActions = async () => {
+    setIsLoading(true);
+    try {
+      const filters: any = {};
+      
+      if (filterAction !== 'all') {
+        filters.action = filterAction;
+      }
+      
+      if (filterAdmin !== 'all') {
+        filters.adminId = filterAdmin;
+      }
+      
+      if (filterDateRange !== 'all') {
+        filters.dateRange = filterDateRange;
+      }
+      
+      const data = await reportService.getAllModerationActions(filters);
+      setActions(data);
+    } catch (error) {
+      console.error('Error fetching moderation actions:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleViewDetail = (action: ModerationAction) => {
     setSelectedAction(action);
@@ -67,24 +94,6 @@ const ModerationHistory: React.FC = () => {
     link.click();
     document.body.removeChild(link);
   };
-
-  // Filter actions based on selected filters
-  const filteredActions = actions.filter(action => {
-    if (filterAction !== 'all' && action.action !== filterAction) return false;
-    if (filterAdmin !== 'all' && action.adminId !== filterAdmin) return false;
-    
-    if (filterDateRange !== 'all') {
-      const actionDate = new Date(action.createdAt);
-      const now = new Date();
-      const daysDiff = Math.floor((now.getTime() - actionDate.getTime()) / (1000 * 60 * 60 * 24));
-      
-      if (filterDateRange === 'today' && daysDiff > 0) return false;
-      if (filterDateRange === 'week' && daysDiff > 7) return false;
-      if (filterDateRange === 'month' && daysDiff > 30) return false;
-    }
-    
-    return true;
-  });
 
   // Get unique admins for filter
   const uniqueAdmins = Array.from(new Set(actions.map(action => action.adminId)))
@@ -317,13 +326,14 @@ const ModerationHistory: React.FC = () => {
       </div>
 
       <DataTable
-        data={filteredActions}
+        data={actions}
         columns={columns}
         actions={renderActions}
         searchable
         pagination
         pageSize={15}
         onRowClick={(action) => handleViewDetail(action)}
+        loading={isLoading}
       />
 
       {/* Action Detail Modal */}

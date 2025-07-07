@@ -148,6 +148,7 @@ const PropertyManagement: React.FC = () => {
                 src={record.images[0]} 
                 alt={record.title}
                 className="w-full h-full object-cover"
+                loading="lazy"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
@@ -532,6 +533,7 @@ const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                   src={property.images[activeImageIndex]} 
                   alt={property.title}
                   className="w-full h-full object-cover"
+                  loading="lazy"
                 />
               </div>
               <div className="flex gap-2 overflow-x-auto">
@@ -547,6 +549,7 @@ const PropertyDetailModal: React.FC<PropertyDetailModalProps> = ({
                       src={image} 
                       alt={`${property.title} ${index + 1}`}
                       className="w-full h-full object-cover"
+                      loading="lazy"
                     />
                   </button>
                 ))}
@@ -961,6 +964,7 @@ const PropertyFormModal: React.FC<PropertyFormModalProps> = ({
                       src={image}
                       alt={`Property ${index + 1}`}
                       className="w-full h-20 object-cover rounded-lg"
+                      loading="lazy"
                     />
                     <button
                       type="button"

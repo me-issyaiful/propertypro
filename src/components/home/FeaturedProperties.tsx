@@ -1,12 +1,64 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import PropertyCard from '../common/PropertyCard';
-import { properties } from '../../data/properties';
+import { Property } from '../../types';
+import { listingService } from '../../services/listingService';
 
 const FeaturedProperties: React.FC = () => {
-  // Get featured/promoted properties
-  const featuredProperties = properties.filter(property => property.isPromoted).slice(0, 6);
+  const [featuredProperties, setFeaturedProperties] = useState<Property[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchFeaturedProperties();
+  }, []);
+
+  const fetchFeaturedProperties = async () => {
+    setIsLoading(true);
+    try {
+      // Get featured/promoted properties
+      const { data } = await listingService.getAllListings(
+        { 
+          sortBy: 'premium',
+          status: 'active'
+        },
+        1, // page
+        6  // pageSize
+      );
+      
+      setFeaturedProperties(data);
+    } catch (error) {
+      console.error('Error fetching featured properties:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <section className="py-12 bg-neutral-100">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between mb-8">
+            <div>
+              <h2 className="font-heading font-bold text-2xl md:text-3xl text-accent mb-2">
+                Properti Unggulan
+              </h2>
+              <p className="text-neutral-600">
+                Temukan properti terbaik dan terbaru dari seluruh Indonesia
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (featuredProperties.length === 0) {
+    return null; // Don't show section if no featured properties
+  }
 
   return (
     <section className="py-12 bg-neutral-100">

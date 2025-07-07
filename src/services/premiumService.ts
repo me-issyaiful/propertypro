@@ -6,9 +6,55 @@ class PremiumService {
   /**
    * Get premium plans configuration
    */
-  getPremiumPlans(): PremiumPlan[] {
-    return [
-      {
+  async getPremiumPlans(): Promise<PremiumPlan[]> {
+    try {
+      const { data, error } = await supabase
+        .from('premium_plans')
+        .select('*')
+        .eq('is_active', true);
+        
+      if (error) {
+        console.error('Supabase error in getPremiumPlans:', error);
+        throw error;
+      }
+      
+      if (!data || data.length === 0) {
+        // Return default plan if no plans found in database
+        return [{
+          id: 'premium-monthly',
+          name: 'Premium Listing',
+          price: 29.99,
+          currency: 'USD',
+          duration: 30,
+          description: 'Boost your property visibility with premium features',
+          features: [
+            'Featured placement at top of search results',
+            'Golden highlighted border',
+            'Larger photo gallery (up to 20 images)',
+            'Extended listing duration (30 days)',
+            'Virtual tour integration',
+            'Detailed analytics dashboard',
+            'Priority customer support',
+            'Social media promotion'
+          ]
+        }];
+      }
+      
+      // Transform database records to PremiumPlan interface
+      return data.map(plan => ({
+        id: plan.id,
+        name: plan.name,
+        price: plan.price,
+        currency: plan.currency,
+        duration: plan.duration,
+        description: plan.description || '',
+        features: plan.features || []
+      }));
+    } catch (error) {
+      console.error('Error fetching premium plans:', error);
+      
+      // Return default plan on error
+      return [{
         id: 'premium-monthly',
         name: 'Premium Listing',
         price: 29.99,
@@ -25,8 +71,8 @@ class PremiumService {
           'Priority customer support',
           'Social media promotion'
         ]
-      }
-    ];
+      }];
+    }
   }
 
   /**
@@ -39,7 +85,8 @@ class PremiumService {
     paymentId: string;
   }): Promise<PremiumListing | null> {
     try {
-      const plan = this.getPremiumPlans().find(p => p.id === data.planId);
+      const plans = await this.getPremiumPlans();
+      const plan = plans.find(p => p.id === data.planId);
       if (!plan) {
         throw new Error('Premium plan not found');
       }
@@ -110,7 +157,7 @@ class PremiumService {
         .from('advertiser_accounts')
         .select('id')
         .eq('user_id', data.billingDetails.userId || '')
-        .single();
+        .maybeSingle();
 
       if (advertiserError && advertiserError.code !== 'PGRST116') {
         throw advertiserError;
@@ -159,6 +206,9 @@ class PremiumService {
 
       if (error) throw error;
 
+      // Store billing details in a separate table or as metadata
+      // In a real implementation, you would store this information properly
+      
       // Transform to PaymentData interface
       return {
         id: paymentData.id,
@@ -249,22 +299,31 @@ class PremiumService {
         .gt('end_date', new Date().toISOString())
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        // If no rows found, return null instead of throwing
+        if (error.code === 'PGRST116') {
+          return null;
+        }
+        console.error('Supabase error in getPremiumListing:', error);
+        throw error;
+      }
 
       if (!data) {
         return null;
       }
 
       // Get the plan
-      const plan = this.getPremiumPlans().find(p => p.id === data.plan_id);
+      const plans = await this.getPremiumPlans();
+      const plan = plans.find(p => p.id === data.plan_id);
       if (!plan) {
-        throw new Error('Premium plan not found');
+        console.error('Premium plan not found for plan_id:', data.plan_id);
+        return null;
       }
 
       // Transform to PremiumListing interface
       return this.transformDbRecordToPremiumListing(data, plan);
     } catch (error) {
-      console.error('Error getting premium listing:', error);
+      console.error('Error getting premium listing for propertyId:', propertyId, error);
       return null;
     }
   }
@@ -282,10 +341,13 @@ class PremiumService {
 
       if (error) throw error;
 
+      // Get all plans
+      const plans = await this.getPremiumPlans();
+
       // Transform to PremiumListing interface
       const premiumListings: PremiumListing[] = [];
       for (const record of data || []) {
-        const plan = this.getPremiumPlans().find(p => p.id === record.plan_id);
+        const plan = plans.find(p => p.id === record.plan_id);
         if (plan) {
           premiumListings.push(this.transformDbRecordToPremiumListing(record, plan));
         }
@@ -375,7 +437,14 @@ class PremiumService {
         .gt('end_date', new Date().toISOString())
         .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        // If no rows found, just return without updating
+        if (error.code === 'PGRST116') {
+          return;
+        }
+        console.error('Supabase error in updateAnalytics:', error);
+        throw error;
+      }
 
       if (!data) {
         return;
@@ -496,14 +565,22 @@ class PremiumService {
       { id: 'virtual-tour', name: 'Virtual Tour', description: '360° property view', icon: 'Eye', enabled: true }
     ];
 
-    // Transform daily views
-    const dailyViews = (record.analytics_daily_views || []).map((entry: any) => ({
+    // Transform daily views - ensure it's an array before mapping
+    const dailyViewsData = Array.isArray(record.analytics_daily_views) 
+      ? record.analytics_daily_views 
+      : [];
+    
+    const dailyViews = dailyViewsData.map((entry: any) => ({
       date: entry.date,
       views: entry.views
     }));
 
-    // Transform top sources
-    const topSources = (record.analytics_top_sources || []).map((entry: any) => ({
+    // Transform top sources - ensure it's an array before mapping
+    const topSourcesData = Array.isArray(record.analytics_top_sources) 
+      ? record.analytics_top_sources 
+      : [];
+    
+    const topSources = topSourcesData.map((entry: any) => ({
       source: entry.source,
       count: entry.count
     }));

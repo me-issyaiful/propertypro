@@ -336,6 +336,10 @@ export interface Database {
           payment_method: string | null
           transaction_id: string | null
           status: Database['public']['Enums']['payment_status'] | null
+          xendit_invoice_id: string | null
+          xendit_payment_method: string | null
+          xendit_payment_channel: string | null
+          xendit_callback_data: Json | null
           payment_date: string | null
           created_at: string | null
           updated_at: string | null
@@ -349,6 +353,10 @@ export interface Database {
           payment_method?: string | null
           transaction_id?: string | null
           status?: Database['public']['Enums']['payment_status'] | null
+          xendit_invoice_id?: string | null
+          xendit_payment_method?: string | null
+          xendit_payment_channel?: string | null
+          xendit_callback_data?: Json | null
           payment_date?: string | null
           created_at?: string | null
           updated_at?: string | null
@@ -362,6 +370,10 @@ export interface Database {
           payment_method?: string | null
           transaction_id?: string | null
           status?: Database['public']['Enums']['payment_status'] | null
+          xendit_invoice_id?: string | null
+          xendit_payment_method?: string | null
+          xendit_payment_channel?: string | null
+          xendit_callback_data?: Json | null
           payment_date?: string | null
           created_at?: string | null
           updated_at?: string | null
@@ -462,6 +474,7 @@ export interface Database {
           land_size: number | null
           province_id: string | null
           city_id: string | null
+          floors: number | null
           district_id: string | null
           address: string | null
           postal_code: string | null
@@ -488,6 +501,7 @@ export interface Database {
           land_size?: number | null
           province_id?: string | null
           city_id?: string | null
+          floors?: number | null
           district_id?: string | null
           address?: string | null
           postal_code?: string | null
@@ -514,6 +528,7 @@ export interface Database {
           land_size?: number | null
           province_id?: string | null
           city_id?: string | null
+          floors?: number | null
           district_id?: string | null
           address?: string | null
           postal_code?: string | null
@@ -664,6 +679,38 @@ export interface Database {
           ip_address?: string | null
           user_agent?: string | null
           created_at?: string
+        }
+      }
+      webhook_logs: {
+        Row: {
+          id: string
+          provider: string
+          event_type: string | null
+          payload: Json
+          headers: Json | null
+          processed: boolean | null
+          error: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          provider: string
+          event_type?: string | null
+          payload: Json
+          headers?: Json | null
+          processed?: boolean | null
+          error?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          provider?: string
+          event_type?: string | null
+          payload?: Json
+          headers?: Json | null
+          processed?: boolean | null
+          error?: string | null
+          created_at?: string | null
         }
       }
     }
