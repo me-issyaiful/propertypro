@@ -81,6 +81,10 @@ export const authMessages = {
     success: {
       title: 'Registration Successful',
       message: 'Your account has been created successfully!'
+    },
+    emailConfirmationSent: { // New message
+      title: 'Verify Your Email',
+      message: 'A confirmation email has been sent to your address. Please check your inbox to activate your account.'
     }
   },
   

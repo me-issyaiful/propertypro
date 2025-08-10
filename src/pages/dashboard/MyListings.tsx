@@ -141,6 +141,10 @@ const MyListings: React.FC = () => {
     );
   };
 
+  const editProperty = (id: string) => {
+    navigate(`/dashboard/listings/edit/${id}`);
+  };
+  
   const confirmDeleteProperty = (listingId: string) => {
     setPropertyToDelete(listingId);
     setShowDeleteModal(true);

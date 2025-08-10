@@ -1,5 +1,16 @@
 import { supabase } from '../lib/supabase';
-import { Category } from '../types/admin';
+
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  icon?: string;
+  isActive: boolean;
+  propertyCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
 
 class CategoryService {
   /**
@@ -73,136 +84,6 @@ class CategoryService {
     } catch (error) {
       console.error('Error fetching category:', error);
       return null;
-    }
-  }
-
-  /**
-   * Create a new category
-   */
-  async createCategory(categoryData: Partial<Category>): Promise<Category | null> {
-    try {
-      const { data, error } = await supabase
-        .from('categories')
-        .insert({
-          name: categoryData.name,
-          slug: categoryData.slug,
-          description: categoryData.description || null,
-          icon: categoryData.icon || null,
-          is_active: categoryData.isActive !== undefined ? categoryData.isActive : true,
-          property_count: 0,
-        })
-        .select()
-        .single();
-      
-      if (error) throw error;
-      
-      return {
-        id: data.id,
-        name: data.name,
-        slug: data.slug,
-        description: data.description || '',
-        icon: data.icon || '',
-        isActive: data.is_active || false,
-        propertyCount: data.property_count || 0,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-      };
-    } catch (error) {
-      console.error('Error creating category:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Update an existing category
-   */
-  async updateCategory(id: string, updates: Partial<Category>): Promise<Category | null> {
-    try {
-      const { data, error } = await supabase
-        .from('categories')
-        .update({
-          name: updates.name,
-          slug: updates.slug,
-          description: updates.description || null,
-          icon: updates.icon || null,
-          is_active: updates.isActive,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      
-      return {
-        id: data.id,
-        name: data.name,
-        slug: data.slug,
-        description: data.description || '',
-        icon: data.icon || '',
-        isActive: data.is_active || false,
-        propertyCount: data.property_count || 0,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-      };
-    } catch (error) {
-      console.error('Error updating category:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Delete a category
-   */
-  async deleteCategory(id: string): Promise<boolean> {
-    try {
-      // First check if category has properties
-      const { data: category, error: fetchError } = await supabase
-        .from('categories')
-        .select('property_count')
-        .eq('id', id)
-        .single();
-      
-      if (fetchError) throw fetchError;
-      
-      if (category && category.property_count > 0) {
-        throw new Error(`Cannot delete category with ${category.property_count} properties`);
-      }
-      
-      // Delete the category
-      const { error } = await supabase
-        .from('categories')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-      
-      return true;
-    } catch (error) {
-      console.error('Error deleting category:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Toggle category active status
-   */
-  async toggleCategoryStatus(id: string, isActive: boolean): Promise<boolean> {
-    try {
-      const { error } = await supabase
-        .from('categories')
-        .update({ 
-          is_active: isActive,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id);
-      
-      if (error) throw error;
-      
-      return true;
-    } catch (error) {
-      console.error('Error toggling category status:', error);
-      return false;
     }
   }
 }

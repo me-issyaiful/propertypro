@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useParams, useSearchParams } from 'react-router-dom';
 import Layout from '../components/layout/Layout';
 import PropertyCard from '../components/common/PropertyCard';
 import SearchBox from '../components/common/SearchBox';
 import { Property } from '../types';
-import { premiumService } from '../services/premiumService';
 import { 
   GridIcon, 
   List, 
@@ -17,7 +16,8 @@ import {
   Move, 
   Home, 
   DollarSign,
-  Check
+  Check,
+  Loader
 } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 import { listingService } from '../services/listingService';
@@ -52,7 +52,9 @@ const PropertyListingPage: React.FC = () => {
   const maxFloors = searchParams.get('maxFloors') ? Number(searchParams.get('maxFloors')) : undefined;
   
   // Get features from URL parameters (can be multiple)
-  const featuresFromUrl = searchParams.getAll('features');
+  const featuresFromUrl = useMemo(() => {
+    return searchParams.getAll('features');
+  }, [searchParams]);
   
   const [properties, setProperties] = useState<Property[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -61,6 +63,7 @@ const PropertyListingPage: React.FC = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 12;
+  const [error, setError] = useState<string | null>(null); // ADD THIS LINE
   
   // Advanced filters state
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -81,7 +84,7 @@ const PropertyListingPage: React.FC = () => {
     maxLandSize: maxLandSize?.toString() || '',
     minFloors: minFloors?.toString() || '',
     maxFloors: maxFloors?.toString() || '',
-    features: [...featuresFromUrl]
+    features: featuresFromUrl
   });
   
   useEffect(() => {
@@ -111,7 +114,23 @@ const PropertyListingPage: React.FC = () => {
   
   const fetchProperties = async () => {
     setIsLoading(true);
+    setError(null);
     try {
+      console.log('PropertyListingPage: Fetching properties with filters:', {
+        purpose,
+        type: propertyType,
+        location: { province, city, district },
+        priceRange: [minPrice, maxPrice],
+        bedrooms: [minBedrooms, maxBedrooms],
+        bathrooms: [minBathrooms, maxBathrooms],
+        buildingSize: [minBuildingSize, maxBuildingSize],
+        landSize: [minLandSize, maxLandSize],
+        floors: [minFloors, maxFloors],
+        features: featuresFromUrl,
+        sortBy,
+        page: currentPage
+      });
+      
       // Prepare filters
       const filters: any = {
         purpose,
@@ -154,6 +173,7 @@ const PropertyListingPage: React.FC = () => {
         filters.features = featuresFromUrl;
       }
       
+      console.log('PropertyListingPage: Calling listingService.getAllListings...');
       // Fetch properties
       const { data, count } = await listingService.getAllListings(
         filters,
@@ -161,11 +181,17 @@ const PropertyListingPage: React.FC = () => {
         pageSize
       );
       
+      console.log('PropertyListingPage: Properties fetched successfully:', data.length, 'properties, total count:', count);
+      console.log('Properties fetched successfully:', data.length, 'properties, total count:', count);
       setProperties(data);
       setTotalCount(count);
-    } catch (error) {
-      console.error('Error fetching properties:', error);
-      showError('Error', 'Failed to load properties. Please try again.');
+    } catch (error: any) { // MODIFIED: Catch error as 'any' for message access
+      console.error('PropertyListingPage: Error fetching properties:', error);
+      setError(error.message || 'Failed to load properties. Please try again.');
+      showError('Error', error.message || 'Failed to load properties. Please try again.');
+      // Set empty data on error
+      setProperties([]);
+      setTotalCount(0);
     } finally {
       setIsLoading(false);
     }
@@ -182,9 +208,10 @@ const PropertyListingPage: React.FC = () => {
   
   const toggleFeature = (featureId: string) => {
     setLocalFilters(prev => {
-      const newFeatures = prev.features.includes(featureId)
-        ? prev.features.filter(id => id !== featureId)
-        : [...prev.features, featureId];
+      const currentFeatures = Array.isArray(prev.features) ? prev.features : [];
+      const newFeatures = currentFeatures.includes(featureId)
+        ? currentFeatures.filter(id => id !== featureId)
+        : [...currentFeatures, featureId];
       
       return {
         ...prev,
@@ -276,9 +303,11 @@ const PropertyListingPage: React.FC = () => {
     
     // Update features filters
     newParams.delete('features');
-    localFilters.features.forEach(feature => {
-      newParams.append('features', feature);
-    });
+    if (Array.isArray(localFilters.features)) {
+      localFilters.features.forEach(feature => {
+        newParams.append('features', feature);
+      });
+    }
     
     // Reset to page 1 when filters change
     newParams.delete('page');
@@ -310,7 +339,7 @@ const PropertyListingPage: React.FC = () => {
       maxLandSize: '',
       minFloors: '',
       maxFloors: '',
-      features: []
+      features: featuresFromUrl
     });
   };
   
@@ -649,7 +678,7 @@ const PropertyListingPage: React.FC = () => {
                                 <input
                                   type="checkbox"
                                   id={`filter-feature-${feature.id}`}
-                                  checked={localFilters.features.includes(feature.id)}
+                                  checked={Array.isArray(localFilters.features) && localFilters.features.includes(feature.id)}
                                   onChange={() => toggleFeature(feature.id)}
                                   className="h-4 w-4 text-primary border-neutral-300 rounded focus:ring-primary"
                                 />
@@ -679,7 +708,25 @@ const PropertyListingPage: React.FC = () => {
             <div className="lg:w-3/4">
               {isLoading ? (
                 <div className="flex justify-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                  <div className="flex flex-col items-center">
+                    <Loader size={40} className="animate-spin text-primary mb-4" /> {/* MODIFIED: Use Loader icon */}
+                    <p className="text-neutral-600">Loading properties...</p>
+                  </div>
+                </div>
+              ) : error ? ( // ADDED: Error display
+                <div className="bg-white rounded-lg shadow-md p-8 text-center">
+                  <h3 className="font-heading font-semibold text-xl mb-2 text-red-600">
+                    Error Loading Properties
+                  </h3>
+                  <p className="text-neutral-600 mb-4">
+                    {error}
+                  </p>
+                  <button 
+                    onClick={fetchProperties} // MODIFIED: Retry fetching
+                    className="btn-primary"
+                  >
+                    Try Again
+                  </button>
                 </div>
               ) : properties.length > 0 ? (
                 <div className={`
@@ -695,7 +742,7 @@ const PropertyListingPage: React.FC = () => {
               ) : (
                 <div className="bg-white rounded-lg shadow-md p-8 text-center">
                   <h3 className="font-heading font-semibold text-xl mb-2">
-                    Tidak ada properti yang ditemukan
+                    Tidak ada iklan yang ditemukan
                   </h3>
                   <p className="text-neutral-600 mb-4">
                     Coba ubah filter pencarian Anda untuk melihat lebih banyak properti

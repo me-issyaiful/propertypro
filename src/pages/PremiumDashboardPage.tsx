@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/layout/Layout';
 import PremiumAnalyticsDashboard from '../components/premium/PremiumAnalyticsDashboard';
-import { Crown, Calendar, CreditCard, Download, RefreshCw } from 'lucide-react';
+import { Crown, Calendar, CreditCard, Download, RefreshCw, Loader, AlertCircle } from 'lucide-react'; // ADDED: Loader, AlertCircle
 import { Helmet } from 'react-helmet-async';
 import { PremiumListing, PaymentData } from '../types/premium';
 import { premiumService } from '../services/premiumService';
@@ -16,6 +16,7 @@ const PremiumDashboardPage: React.FC = () => {
   const [payments, setPayments] = useState<PaymentData[]>([]);
   const [selectedListing, setSelectedListing] = useState<PremiumListing | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null); // ADD THIS LINE
 
   useEffect(() => {
     if (user) {
@@ -27,6 +28,7 @@ const PremiumDashboardPage: React.FC = () => {
     if (!user) return;
     
     setIsLoading(true);
+    setError(null);
     try {
       // Get user's premium listings
       const userListings = await premiumService.getUserPremiumListings(user.id);
@@ -46,9 +48,10 @@ const PremiumDashboardPage: React.FC = () => {
       
       // Check for expired listings
       await premiumService.checkExpiredListings();
-    } catch (error) {
+    } catch (error: any) { // MODIFIED: Catch error as 'any'
       console.error('Failed to load premium data:', error);
-      showError('Error', 'Failed to load premium data. Please try again.');
+      setError(error.message || 'Failed to load premium data. Please try again.'); // ADDED: Set error message
+      showError('Error', error.message || 'Failed to load premium data. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -88,8 +91,35 @@ const PremiumDashboardPage: React.FC = () => {
       <Layout>
         <div className="container mx-auto px-4 py-12">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+            <Loader size={40} className="animate-spin text-yellow-500 mx-auto mb-4" /> {/* MODIFIED: Use Loader icon */}
             <p className="text-neutral-600">Loading your premium dashboard...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // MODIFIED: Handle error state
+  if (error) {
+    return (
+      <Layout>
+        <Helmet>
+          <title>Premium Dashboard | Properti Pro</title>
+          <meta name="robots" content="noindex, nofollow" />
+        </Helmet>
+        <div className="container mx-auto px-4 py-12">
+          <div className="bg-white rounded-lg shadow-md p-8 text-center">
+            <AlertCircle size={64} className="mx-auto text-red-500 mb-6" />
+            <h1 className="text-3xl font-bold text-neutral-800 mb-4">Error Loading Dashboard</h1>
+            <p className="text-neutral-600 mb-8">
+              {error}
+            </p>
+            <button
+              onClick={loadData} // MODIFIED: Retry loading data
+              className="btn-primary"
+            >
+              Try Again
+            </button>
           </div>
         </div>
       </Layout>

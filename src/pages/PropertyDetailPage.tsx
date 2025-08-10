@@ -24,7 +24,8 @@ import {
   Briefcase,
   Sun,
   Shield,
-  LayoutGrid
+  LayoutGrid,
+  Loader
 } from 'lucide-react';
 import { formatPrice } from '../utils/formatter';
 import { Helmet } from 'react-helmet-async';
@@ -85,6 +86,7 @@ const PropertyDetailPage: React.FC = () => {
   const [isContactFormVisible, setIsContactFormVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [similarProperties, setSimilarProperties] = useState<Property[]>([]);
+  const [error, setError] = useState<string | null>(null); // ADD THIS LINE
   
   useEffect(() => {
     if (id) {
@@ -97,6 +99,7 @@ const PropertyDetailPage: React.FC = () => {
   
   const fetchPropertyDetails = async (propertyId: string) => {
     setIsLoading(true);
+    setError(null);
     try {
       // Fetch property details
       const propertyData = await listingService.getListingById(propertyId);
@@ -122,9 +125,10 @@ const PropertyDetailPage: React.FC = () => {
       const filteredSimilar = similarData.filter(p => p.id !== propertyId);
       setSimilarProperties(filteredSimilar);
       
-    } catch (error) {
+    } catch (error: any) { // MODIFIED: Catch error as 'any' for message access
       console.error('Error fetching property details:', error);
-      showError('Error', 'Failed to load property details. Please try again.');
+      setError(error.message || 'Failed to load property details. Please try again.'); // ADDED: Set error message
+      showError('Error', error.message || 'Failed to load property details. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -135,20 +139,21 @@ const PropertyDetailPage: React.FC = () => {
       <Layout>
         <div className="container mx-auto px-4 py-12">
           <div className="flex justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <Loader size={40} className="animate-spin text-primary" /> {/* MODIFIED: Use Loader icon */}
           </div>
         </div>
       </Layout>
     );
   }
   
-  if (!property) {
+  // MODIFIED: Handle error state
+  if (error || !property) {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-12">
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
             <h2 className="font-heading text-2xl font-bold mb-4">Properti Tidak Ditemukan</h2>
-            <p className="mb-6">Maaf, properti yang Anda cari tidak ditemukan atau telah dihapus.</p>
+            <p className="mb-6">{error || 'Maaf, properti yang Anda cari tidak ditemukan atau telah dihapus.'}</p>
             <Link to="/" className="btn-primary">
               Kembali ke Beranda
             </Link>

@@ -20,15 +20,17 @@ const RegisterPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
-  const { signUp, isAuthenticated, loading, error, clearError } = useAuth();
+  const { signUp, isAuthenticated, loading, error, clearError, user } = useAuth();
   const { showError, showSuccess } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (isAuthenticated) {
+    // If user is authenticated and their status is 'active', redirect to home
+    // If status is 'pending_verification', keep them on a page that tells them to verify
+    if (isAuthenticated && !loading && (user?.status === 'active' || user?.status === 'suspended')) {
       navigate('/', { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, loading, navigate, user]); // Added user to dependency array
 
   useEffect(() => {
     clearError();
@@ -135,14 +137,12 @@ const RegisterPage: React.FC = () => {
       });
 
       showSuccess(
-        authMessages.register.success.title,
-        authMessages.register.success.message
+        authMessages.register.emailConfirmationSent.title, // New message
+        authMessages.register.emailConfirmationSent.message // New message
       );
       
-      // Navigate to login page after successful registration
-      setTimeout(() => {
-        navigate('/login');
-      }, 2000);
+      // No immediate redirect to login, user needs to verify email first
+      // User will be redirected by the Edge Function after successful verification
     } catch (error) {
       // Error is handled by the useEffect above
       console.error('Registration failed:', error);

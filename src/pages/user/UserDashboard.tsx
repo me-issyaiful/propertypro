@@ -57,7 +57,12 @@ const UserDashboard: React.FC = () => {
       const favoriteCount = Math.floor(totalViews * 0.03); // Estimate 3% of views become favorites
       
       // Generate recent activity
-      const recentActivity = [];
+      const recentActivity: {
+        id: string;
+        type: string;
+        message: string;
+        date: string;
+      }[] = [];
       
       // Add view activities
       for (let i = 0; i < 2; i++) {

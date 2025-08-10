@@ -13,7 +13,8 @@ import {
   AlertCircle,
   CheckCircle,
   Home,
-  MapPin
+  MapPin,
+  Loader
 } from 'lucide-react';
 import { formatPrice } from '../../utils/formatter';
 import { useToast } from '../../contexts/ToastContext';
@@ -61,9 +62,10 @@ const UserProperties: React.FC = () => {
     try {
       const userListings = await listingService.getUserListings(user.id);
       setProperties(userListings);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching properties:', err);
-      setError('Failed to load properties. Please try again later.');
+      setError(err.message || 'Failed to load properties. Please try again later.'); // ADDED: Set error message
+      showError('Error', err.message || 'Failed to load properties. Please try again later.');
     } finally {
       setIsLoading(false);
     }
@@ -115,11 +117,6 @@ const UserProperties: React.FC = () => {
     setFilteredProperties(filtered);
   };
   
-  const editProperty = (id: string) => {
-    // Navigate to the edit property page
-    navigate(`/dashboard/listings/edit/${id}`);
-  };
-  
   const confirmDeleteProperty = (id: string) => {
     setPropertyToDelete(id);
     setShowDeleteModal(true);
@@ -139,14 +136,18 @@ const UserProperties: React.FC = () => {
       } else {
         throw new Error('Failed to delete property');
       }
-    } catch (err) {
+    } catch (err: any) { // MODIFIED: Catch error as 'any'
       console.error('Error deleting property:', err);
-      showError('Failed to delete property', 'Please try again.');
+      showError('Failed to delete property', err.message || 'Please try again.');
     } finally {
       setIsLoading(false);
       setShowDeleteModal(false);
       setPropertyToDelete(null);
     }
+  };
+  
+  const handleUpgradeToPremium = (listingId: string) => {
+    window.location.href = `/premium/upgrade?propertyId=${listingId}`;
   };
   
   const getStatusBadge = (status: string) => {
@@ -187,7 +188,7 @@ const UserProperties: React.FC = () => {
   if (isLoading && properties.length === 0) {
     return (
       <div className="bg-white rounded-lg shadow-md p-8 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <Loader size={40} className="animate-spin text-primary" /> {/* MODIFIED: Use Loader icon */}
       </div>
     );
   }
@@ -201,7 +202,7 @@ const UserProperties: React.FC = () => {
         </div>
         <p className="text-neutral-700">{error}</p>
         <button 
-          onClick={getPropertyList}
+          onClick={getPropertyList} // MODIFIED: Retry fetching
           className="mt-4 btn-primary"
         >
           Try Again

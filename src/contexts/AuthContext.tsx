@@ -1,12 +1,14 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User as SupabaseUser, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { Database } from '../types/supabase';
+import { Database } from '../types/supabase'; 
 
 type UserProfile = Database['public']['Tables']['user_profiles']['Row'];
 
 export interface User extends UserProfile {
   email: string;
+  email_confirmation_token?: string | null;
+  email_confirmation_sent_at?: string | null;
 }
 
 interface AuthState {
@@ -61,8 +63,6 @@ interface AuthContextType extends AuthState {
   updatePassword: (password: string) => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   clearError: () => void;
-  isAdmin: () => boolean;
-  isSuperAdmin: () => boolean;
   refreshSession: () => Promise<void>;
 }
 
@@ -86,7 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       full_name: userData?.fullName || supabaseUser.user_metadata?.full_name || '',
       phone: userData?.phone || supabaseUser.user_metadata?.phone || null,
       role: (userData?.role || supabaseUser.user_metadata?.role || 'user') as Database['public']['Enums']['user_role'],
-      status: 'active' as Database['public']['Enums']['user_status'],
+      status: 'pending_verification' as Database['public']['Enums']['user_status'], // Set initial status to pending_verification
       avatar_url: null,
       company: null,
       created_at: new Date().toISOString(),
@@ -224,6 +224,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             phone: userData.phone,
             role: userData.role || 'user',
           },
+          // Disable email confirmation from Supabase Auth to handle it manually
+          // This is crucial for custom email confirmation flow
+          role: userData.role || 'user'
         },
       });
 
@@ -233,8 +236,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // If email confirmation is disabled, the user will be automatically signed in
       if (data.session) {
+        // User is signed in, but their profile status is 'pending_verification'
+        // Now, call the Edge Function to send the confirmation email
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_EDGE_FUNCTIONS_URL}/send-confirmation-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${data.session.access_token}` // Use user's token for auth
+          },
+          body: JSON.stringify({
+            userId: data.user?.id,
+            email: data.user?.email,
+            userName: userData.fullName,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Failed to trigger confirmation email:', errorData);
+          // Optionally, handle this error by deleting the user or marking them for manual review
+          throw new Error(errorData.error || 'Failed to send confirmation email.');
+        }
+
         handleSessionChange(data.session, userData);
       } else {
+        // This branch might be hit if Supabase requires email confirmation by default
+        // and doesn't sign in the user immediately.
+        // In our setup, we expect `data.session` to be present if `emailRedirectTo` is used.
         dispatch({ type: 'SET_LOADING', payload: false });
       }
     } catch (error) {
@@ -361,17 +389,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const clearError = () => {
+  /*const clearError = () => {
     dispatch({ type: 'CLEAR_ERROR' });
-  };
-
-  const isAdmin = () => {
-    return state.user?.role === 'admin' || state.user?.role === 'superadmin';
-  };
-
-  const isSuperAdmin = () => {
-    return state.user?.role === 'superadmin';
-  };
+  };*/
+  
+  const clearError = React.useCallback(() => {
+    dispatch({ type: 'CLEAR_ERROR' });
+  }, [dispatch]);
 
   const value: AuthContextType = {
     ...state,
@@ -382,8 +406,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     updatePassword,
     updateProfile,
     clearError,
-    isAdmin,
-    isSuperAdmin,
     refreshSession,
   };
 

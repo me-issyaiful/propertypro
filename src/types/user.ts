@@ -11,7 +11,7 @@ export interface UserProfile {
   /** Phone number (optional) */
   phone: string | null;
   /** User role */
-  role: 'user' | 'agent' | 'admin' | 'superadmin';
+  role: 'user' | 'agent';
   /** User status */
   status: 'active' | 'inactive' | 'suspended';
   /** Avatar URL (optional) */

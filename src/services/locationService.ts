@@ -1,104 +1,88 @@
 import { supabase } from '../lib/supabase';
-import { Location, LocationHierarchy } from '../types/admin';
+
+export interface Location {
+  id: string;
+  name: string;
+  type: 'provinsi' | 'kota' | 'kecamatan' | 'kelurahan';
+  parent_id?: string;
+  slug: string;
+  description?: string;
+  is_active?: boolean;
+  property_count?: number;
+  latitude?: number;
+  longitude?: number;
+  created_at: string;
+  updated_at: string;
+  image_url?: string | null; // Added
+  image_alt_text?: string | null; // Added
+}
 
 class LocationService {
-  /**
-   * Get all locations with optional filtering
-   */
-  async getAllLocations(filters?: { 
-    type?: string; 
-    isActive?: boolean; 
-    parentId?: string;
-    search?: string;
-  }): Promise<Location[]> {
+  async getProvinces(): Promise<{id: string, name: string}[]> {
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('locations')
-        .select('*');
+        .select('id, name')
+        .eq('type', 'provinsi')
+        .eq('is_active', true)
+        .order('name');
 
-      // Apply filters
-      if (filters) {
-        if (filters.type && filters.type !== 'all') {
-          query = query.eq('type', filters.type);
-        }
-        
-        if (filters.isActive !== undefined) {
-          query = query.eq('is_active', filters.isActive);
-        }
-        
-        if (filters.parentId) {
-          query = query.eq('parent_id', filters.parentId);
-        } else if (filters.parentId === '') {
-          query = query.is('parent_id', null);
-        }
-        
-        if (filters.search) {
-          query = query.or(`name.ilike.%${filters.search}%,slug.ilike.%${filters.search}%`);
-        }
+      if (error) {
+        console.error('Error fetching provinces:', error);
+        throw error;
       }
-      
-      // Execute query
-      const { data, error } = await query.order('name');
-      
-      if (error) throw error;
-      
-      // Map database locations to Location interface
-      return (data || []).map(location => ({
-        id: location.id,
-        name: location.name,
-        type: location.type,
-        parentId: location.parent_id || undefined,
-        slug: location.slug,
-        description: location.description || '',
-        isActive: location.is_active || false,
-        propertyCount: location.property_count || 0,
-        coordinates: location.latitude && location.longitude ? {
-          latitude: location.latitude,
-          longitude: location.longitude,
-        } : undefined,
-        createdAt: location.created_at,
-        updatedAt: location.updated_at,
-      }));
+
+      return data || [];
     } catch (error) {
-      console.error('Error fetching locations:', error);
-      return [];
+      console.error('Failed to fetch provinces:', error);
+      throw error;
     }
   }
 
-  /**
-   * Build location hierarchy
-   */
-  buildLocationHierarchy(locations: Location[]): LocationHierarchy[] {
-    const locationMap = new Map<string, LocationHierarchy>();
-    const rootLocations: LocationHierarchy[] = [];
+  async getCitiesByProvince(provinceId: string): Promise<{id: string, name: string}[]> {
+    try {
+      const { data, error } = await supabase
+        .from('locations')
+        .select('id, name')
+        .eq('type', 'kota')
+        .eq('parent_id', provinceId)
+        .eq('is_active', true)
+        .order('name');
 
-    // Create map of all locations
-    locations.forEach(location => {
-      locationMap.set(location.id, { ...location, children: [] });
-    });
-
-    // Build hierarchy
-    locations.forEach(location => {
-      const locationNode = locationMap.get(location.id)!;
-      
-      if (location.parentId) {
-        const parent = locationMap.get(location.parentId);
-        if (parent) {
-          parent.children = parent.children || [];
-          parent.children.push(locationNode);
-          locationNode.parent = parent;
-        }
-      } else {
-        rootLocations.push(locationNode);
+      if (error) {
+        console.error('Error fetching cities:', error);
+        throw error;
       }
-    });
 
-    return rootLocations;
+      return data || [];
+    } catch (error) {
+      console.error('Failed to fetch cities:', error);
+      throw error;
+    }
   }
 
-  /**
-   * Get a single location by ID
-   */
+  async getDistrictsByCity(cityId: string): Promise<{id: string, name: string}[]> {
+    try {
+      const { data, error } = await supabase
+        .from('locations')
+        .select('id, name')
+        .eq('type', 'kecamatan')
+        .eq('parent_id', cityId)
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) {
+        console.error('Error fetching districts:', error);
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Failed to fetch districts:', error);
+      throw error;
+    }
+  }
+
   async getLocationById(id: string): Promise<Location | null> {
     try {
       const { data, error } = await supabase
@@ -106,187 +90,81 @@ class LocationService {
         .select('*')
         .eq('id', id)
         .single();
-      
-      if (error) throw error;
-      if (!data) return null;
-      
-      return {
-        id: data.id,
-        name: data.name,
-        type: data.type,
-        parentId: data.parent_id || undefined,
-        slug: data.slug,
-        description: data.description || '',
-        isActive: data.is_active || false,
-        propertyCount: data.property_count || 0,
-        coordinates: data.latitude && data.longitude ? {
-          latitude: data.latitude,
-          longitude: data.longitude,
-        } : undefined,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-      };
-    } catch (error) {
-      console.error('Error fetching location:', error);
-      return null;
-    }
-  }
 
-  /**
-   * Create a new location
-   */
-  async createLocation(locationData: Partial<Location>): Promise<Location | null> {
-    try {
-      const { data, error } = await supabase
-        .from('locations')
-        .insert({
-          name: locationData.name,
-          type: locationData.type,
-          parent_id: locationData.parentId || null,
-          slug: locationData.slug,
-          description: locationData.description || null,
-          is_active: locationData.isActive !== undefined ? locationData.isActive : true,
-          property_count: 0,
-          latitude: locationData.coordinates?.latitude || null,
-          longitude: locationData.coordinates?.longitude || null,
-        })
-        .select()
-        .single();
-      
-      if (error) throw error;
-      
-      return {
-        id: data.id,
-        name: data.name,
-        type: data.type,
-        parentId: data.parent_id || undefined,
-        slug: data.slug,
-        description: data.description || '',
-        isActive: data.is_active || false,
-        propertyCount: data.property_count || 0,
-        coordinates: data.latitude && data.longitude ? {
-          latitude: data.latitude,
-          longitude: data.longitude,
-        } : undefined,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-      };
-    } catch (error) {
-      console.error('Error creating location:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Update an existing location
-   */
-  async updateLocation(id: string, updates: Partial<Location>): Promise<Location | null> {
-    try {
-      const { data, error } = await supabase
-        .from('locations')
-        .update({
-          name: updates.name,
-          type: updates.type,
-          parent_id: updates.parentId || null,
-          slug: updates.slug,
-          description: updates.description || null,
-          is_active: updates.isActive,
-          latitude: updates.coordinates?.latitude || null,
-          longitude: updates.coordinates?.longitude || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', id)
-        .select()
-        .single();
-      
-      if (error) throw error;
-      
-      return {
-        id: data.id,
-        name: data.name,
-        type: data.type,
-        parentId: data.parent_id || undefined,
-        slug: data.slug,
-        description: data.description || '',
-        isActive: data.is_active || false,
-        propertyCount: data.property_count || 0,
-        coordinates: data.latitude && data.longitude ? {
-          latitude: data.latitude,
-          longitude: data.longitude,
-        } : undefined,
-        createdAt: data.created_at,
-        updatedAt: data.updated_at,
-      };
-    } catch (error) {
-      console.error('Error updating location:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Delete a location
-   */
-  async deleteLocation(id: string): Promise<boolean> {
-    try {
-      // First check if location has properties
-      const { data: location, error: fetchError } = await supabase
-        .from('locations')
-        .select('property_count')
-        .eq('id', id)
-        .single();
-      
-      if (fetchError) throw fetchError;
-      
-      if (location && location.property_count > 0) {
-        throw new Error(`Cannot delete location with ${location.property_count} properties`);
+      if (error) {
+        console.error('Error fetching location:', error);
+        throw error;
       }
-      
-      // Check if location has children
-      const { data: children, error: childrenError } = await supabase
-        .from('locations')
-        .select('id')
-        .eq('parent_id', id);
-      
-      if (childrenError) throw childrenError;
-      
-      if (children && children.length > 0) {
-        throw new Error(`Cannot delete location with ${children.length} child locations`);
-      }
-      
-      // Delete the location
-      const { error } = await supabase
-        .from('locations')
-        .delete()
-        .eq('id', id);
-      
-      if (error) throw error;
-      
-      return true;
+
+      return data;
     } catch (error) {
-      console.error('Error deleting location:', error);
-      return false;
+      console.error('Failed to fetch location:', error);
+      throw error;
     }
   }
 
-  /**
-   * Toggle location active status
-   */
-  async toggleLocationStatus(id: string, isActive: boolean): Promise<boolean> {
+  async searchLocations(query: string, type?: string): Promise<Location[]> {
     try {
-      const { error } = await supabase
+      let queryBuilder = supabase
         .from('locations')
-        .update({ 
-          is_active: isActive,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id);
-      
-      if (error) throw error;
-      
-      return true;
+        .select('*')
+        .eq('is_active', true)
+        .ilike('name', `%${query}%`)
+        .order('name')
+        .limit(10);
+
+      if (type) {
+        queryBuilder = queryBuilder.eq('type', type);
+      }
+
+      const { data, error } = await queryBuilder;
+
+      if (error) {
+        console.error('Error searching locations:', error);
+        throw error;
+      }
+
+      return data || [];
     } catch (error) {
-      console.error('Error toggling location status:', error);
-      return false;
+      console.error('Failed to search locations:', error);
+      throw error;
+    }
+  }
+
+  async getAllLocations(filters?: {
+    isActive?: boolean;
+    search?: string;
+    type?: string;
+  }): Promise<Location[]> {
+    try {
+      let queryBuilder = supabase
+        .from('locations')
+        .select('*')
+        .order('name');
+
+      if (filters?.isActive !== undefined) {
+        queryBuilder = queryBuilder.eq('is_active', filters.isActive);
+      }
+
+      if (filters?.search) {
+        queryBuilder = queryBuilder.ilike('name', `%${filters.search}%`);
+      }
+
+      if (filters?.type) {
+        queryBuilder = queryBuilder.eq('type', filters.type);
+      }
+
+      const { data, error } = await queryBuilder;
+
+      if (error) {
+        console.error('Error fetching all locations:', error);
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Failed to fetch all locations:', error);
+      throw error;
     }
   }
 }

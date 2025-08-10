@@ -3,9 +3,6 @@ import { PremiumListing, PremiumPlan, PaymentData, BillingDetails } from '../typ
 import { format } from 'date-fns';
 
 class PremiumService {
-  /**
-   * Get premium plans configuration
-   */
   async getPremiumPlans(): Promise<PremiumPlan[]> {
     try {
       const { data, error } = await supabase
@@ -286,32 +283,42 @@ class PremiumService {
     }
   }
 
-  /**
-   * Get a premium listing by property ID from Supabase
-   */
   async getPremiumListing(propertyId: string): Promise<PremiumListing | null> {
     try {
+      console.log('getPremiumListing called with propertyId:', propertyId);
+      
+      // Check if Supabase client is properly configured
+      if (!supabase || !supabase.supabaseUrl || !supabase.supabaseKey) {
+        console.warn('Supabase client not properly configured');
+        return null;
+      }
+
+      console.log('Attempting to fetch premium listing from database...');
       const { data, error } = await supabase
         .from('premium_listings')
-        .select('*')
+        .select('id, property_id, user_id, plan_id, status, start_date, end_date, payment_id, analytics_views, analytics_inquiries, analytics_favorites, analytics_conversion_rate, analytics_daily_views, analytics_top_sources, created_at, updated_at')
         .eq('property_id', propertyId)
         .eq('status', 'active')
         .gt('end_date', new Date().toISOString())
         .maybeSingle();
 
       if (error) {
-        // If no rows found, return null instead of throwing
+        console.error('Supabase query error in getPremiumListing:', error);
+        console.error('Supabase error fetching premium_listings:', error);
         if (error.code === 'PGRST116') {
+          console.log('No premium listing found for property:', propertyId);
           return null;
         }
-        console.error('Supabase error in getPremiumListing:', error);
         throw error;
       }
 
       if (!data) {
+        console.log('No active premium listing found for property:', propertyId);
         return null;
       }
 
+      console.log('Premium listing data retrieved:', data);
+      
       // Get the plan
       const plans = await this.getPremiumPlans();
       const plan = plans.find(p => p.id === data.plan_id);
@@ -323,7 +330,14 @@ class PremiumService {
       // Transform to PremiumListing interface
       return this.transformDbRecordToPremiumListing(data, plan);
     } catch (error) {
-      console.error('Error getting premium listing for propertyId:', propertyId, error);
+      // Handle network errors gracefully
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        console.warn('Network error fetching premium listing for property', propertyId, '- Supabase may be unreachable:', error.message);
+        return null;
+      }
+      
+      // Handle other errors
+      console.error('Unexpected error in getPremiumListing function for property', propertyId, ':', error);
       return null;
     }
   }
@@ -554,7 +568,7 @@ class PremiumService {
   /**
    * Transform a database record to a PremiumListing interface
    */
-  private transformDbRecordToPremiumListing(record: any, plan: PremiumPlan): PremiumListing {
+  transformDbRecordToPremiumListing(record: any, plan: PremiumPlan): PremiumListing {
     // Create premium features
     const features = [
       { id: 'featured', name: 'Featured Placement', description: 'Top of search results', icon: 'Star', enabled: true },

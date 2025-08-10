@@ -1,3 +1,5 @@
+import { PremiumListing } from './premium';
+
 /**
  * Core property interface representing a real estate listing
  */
@@ -46,6 +48,8 @@ export interface Property {
   views?: number;
   /** Number of inquiries the property has received */
   inquiries?: number;
+  /** Premium listing details if the property is premium */
+  premiumDetails?: PremiumListing | null;
 }
 
 /**
@@ -130,7 +134,7 @@ export interface User {
   /** URL to user's avatar image (optional) */
   avatar?: string;
   /** User role */
-  role: 'user' | 'agent' | 'admin' | 'superadmin';
+  role: 'user' | 'agent';
   /** Array of saved property IDs */
   savedProperties?: string[];
   /** User status */

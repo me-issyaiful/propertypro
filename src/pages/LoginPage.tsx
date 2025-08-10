@@ -151,20 +151,6 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  const fillDemoCredentials = (type: 'admin' | 'superadmin') => {
-    if (type === 'admin') {
-      setEmail('admin@propertipro.id');
-      setPassword('admin123');
-      setEmailError('');
-      setPasswordError('');
-    } else {
-      setEmail('superadmin@propertipro.id');
-      setPassword('admin123');
-      setEmailError('');
-      setPasswordError('');
-    }
-  };
-  
   return (
     <Layout>
       <Helmet>
@@ -285,31 +271,6 @@ const LoginPage: React.FC = () => {
                     Daftar sekarang
                   </Link>
                 </p>
-              </div>
-
-              {/* Demo credentials for testing */}
-              <div className="mt-6 pt-6 border-t border-neutral-200">
-                <div className="bg-neutral-50 p-3 rounded-lg">
-                  <p className="text-xs text-neutral-600 mb-3">Demo Credentials (Click to fill):</p>
-                  <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={() => fillDemoCredentials('admin')}
-                      className="w-full text-left text-xs bg-white border border-neutral-200 rounded px-2 py-1 hover:bg-neutral-50 transition-colors"
-                      disabled={loading}
-                    >
-                      <strong>Admin:</strong> admin@propertipro.id / admin123
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => fillDemoCredentials('superadmin')}
-                      className="w-full text-left text-xs bg-white border border-neutral-200 rounded px-2 py-1 hover:bg-neutral-50 transition-colors"
-                      disabled={loading}
-                    >
-                      <strong>Super Admin:</strong> superadmin@propertipro.id / admin123
-                    </button>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
