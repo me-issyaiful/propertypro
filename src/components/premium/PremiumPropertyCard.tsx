@@ -1,11 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { Heart, MapPin, Bed, Bath, Move, Eye, TrendingUp, Home } from 'lucide-react';
 import { Property } from '../../types';
 import { PremiumListing } from '../../types/premium';
 import { formatPrice } from '../../utils/formatter';
 import PremiumBadge from './PremiumBadge';
 import { premiumService } from '../../services/premiumService';
+import { favoriteService } from '../../services/favoriteService';
+import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 
 interface PremiumPropertyCardProps {
   property: Property;
@@ -18,6 +22,11 @@ const PremiumPropertyCard: React.FC<PremiumPropertyCardProps> = ({
   premiumListing,
   onAnalyticsUpdate
 }) => {
+  const { user, isAuthenticated } = useAuth();
+  const { showSuccess, showError, showInfo } = useToast();
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [isToggling, setIsToggling] = useState(false);
+
   // Defensive check to prevent crashes from null/undefined props
   if (!property) {
     console.error('PremiumPropertyCard received null or undefined property prop:', property);
@@ -34,6 +43,24 @@ const PremiumPropertyCard: React.FC<PremiumPropertyCardProps> = ({
     console.error('PremiumPropertyCard: premiumListing.analytics is undefined. PremiumListing:', premiumListing);
     return null;
   }
+
+  // Check if property is favorited when component mounts
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      checkFavoriteStatus();
+    }
+  }, [isAuthenticated, user, property.id]);
+
+  const checkFavoriteStatus = async () => {
+    if (!user) return;
+    
+    try {
+      const favorited = await favoriteService.isFavorited(property.id, user.id);
+      setIsFavorited(favorited);
+    } catch (error) {
+      console.error('Error checking favorite status:', error);
+    }
+  };
 
   const {
     id,
@@ -67,7 +94,56 @@ const PremiumPropertyCard: React.FC<PremiumPropertyCardProps> = ({
   const handleFavoriteClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
+    if (!isAuthenticated || !user) {
+      showInfo(
+        'Login Required',
+        'Please log in to save properties to your favorites.'
+      );
+      return;
+    }
+
+    handleToggleFavorite();
+  };
+
+  const handleToggleFavorite = async () => {
+    if (!user) return;
+
+    setIsToggling(true);
+
+    try {
+      const result = await favoriteService.toggleFavorite(property.id, user.id);
+      
+      if (result.success) {
+        setIsFavorited(result.isFavorited);
+        
+        if (result.isFavorited) {
+          showSuccess(
+            'Property Saved',
+            'Property has been added to your favorites.'
+          );
+        } else {
+          showSuccess(
+            'Property Removed',
+            'Property has been removed from your favorites.'
+          );
+        }
+      } else {
+        showError(
+          'Error',
+          'Failed to update favorites. Please try again.'
+        );
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      showError(
+        'Error',
+        'Failed to update favorites. Please try again.'
+      );
+    } finally {
+      setIsToggling(false);
+    }
+
     if (isPremium) {
       // Update analytics in Supabase
       premiumService.updateAnalytics(id, 'favorite');
@@ -106,11 +182,20 @@ const PremiumPropertyCard: React.FC<PremiumPropertyCardProps> = ({
         
         <div className="absolute top-2 right-2 z-10">
           <button 
-            className="bg-white p-1.5 rounded-full shadow-md hover:bg-primary hover:text-white transition-colors duration-300"
-            aria-label="Simpan properti ini"
             onClick={handleFavoriteClick}
+            disabled={isToggling}
+            className={`p-1.5 rounded-full shadow-md transition-colors duration-300 ${
+              isFavorited 
+                ? 'bg-red-500 text-white hover:bg-red-600' 
+                : 'bg-white text-neutral-600 hover:bg-primary hover:text-white'
+            } ${isToggling ? 'opacity-50 cursor-not-allowed' : ''}`}
+            aria-label="Simpan properti ini"
           >
-            <Heart size={18} />
+            {isToggling ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+            ) : (
+              <Heart size={18} className={isFavorited ? 'fill-current' : ''} />
+            )}
           </button>
         </div>
         

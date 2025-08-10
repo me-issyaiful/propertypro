@@ -133,6 +133,8 @@ export interface UserFavorite {
   createdAt: string;
   /** Property information */
   property?: {
+    /** Property ID */
+    id: string;
     /** Property title */
     title: string;
     /** Property price */
@@ -142,7 +144,16 @@ export interface UserFavorite {
     /** Property image URL */
     imageUrl: string;
     /** Property location */
-    location: string;
+    location: {
+      /** City name */
+      city: string;
+      /** Province name */
+      province: string;
+    };
+    /** Property type */
+    type: string;
+    /** Property purpose */
+    purpose: 'jual' | 'sewa';
   };
 }
 

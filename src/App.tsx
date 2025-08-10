@@ -33,6 +33,7 @@ import UserLayout from './components/user/UserLayout';
 import UserDashboard from './pages/user/UserDashboard';
 import UserProfile from './pages/user/UserProfile';
 import UserProperties from './pages/user/UserProperties';
+import UserFavorites from './pages/user/UserFavorites';
 import { supabase } from './lib/supabase';
 
 function App() {
@@ -103,6 +104,7 @@ function App() {
                 <Route path="dashboard" element={<UserDashboard />} />
                 <Route path="profile" element={<UserProfile />} />
                 <Route path="properties" element={<UserProperties />} />
+                <Route path="favorites" element={<UserFavorites />} />
               </Route>
             </Routes>
           </Router>

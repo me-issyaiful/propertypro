@@ -149,6 +149,7 @@ const Header: React.FC = () => {
             {isAuthenticated ? (
               <>
                 <Link to="/favorit" className="flex items-center space-x-2 py-2" onClick={toggleMenu}>
+                <Link to="/user/favorites" className="flex items-center space-x-2 py-2" onClick={toggleMenu}>
                   <Heart size={20} />
                   <span>Favorit</span>
                 </Link>

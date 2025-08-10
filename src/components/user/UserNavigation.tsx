@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { User, Home, LayoutDashboard, Settings, LogOut } from 'lucide-react';
+import { User, Home, LayoutDashboard, Settings, LogOut, Heart } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 const UserNavigation: React.FC = () => {
@@ -23,6 +23,12 @@ const UserNavigation: React.FC = () => {
       label: 'My Properties', 
       path: '/user/properties',
       description: 'Manage your listings'
+    },
+    { 
+      icon: Heart, 
+      label: 'Favorites', 
+      path: '/user/favorites',
+      description: 'Saved properties'
     },
     { 
       icon: User, 
