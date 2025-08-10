@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { 
   Heart, 
   MapPin, 
+  Loader,
   Bed, 
   Bath, 
   Move, 
@@ -20,7 +21,6 @@ import {
 } from 'lucide-react';
 import { Property } from '../../types';
 import { formatPrice } from '../../utils/formatter';
-import { premiumService } from '../../services/premiumService';
 import PremiumPropertyCard from '../premium/PremiumPropertyCard';
 import { getFeatureLabelById } from '../../types/listing';
 
@@ -74,37 +74,12 @@ const featureIcons: Record<string, React.ElementType> = {
 };
 
 const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
-  const [premiumListing, setPremiumListing] = React.useState<any>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    checkPremiumStatus();
-  }, []);
-
-  const checkPremiumStatus = async () => {
-    try {
-      const premium = await premiumService.getPremiumListing(property.id);
-      setPremiumListing(premium);
-    } catch (error) {
-      console.error('Error checking premium status:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleAnalyticsUpdate = (type: 'view' | 'inquiry' | 'favorite') => {
-    if (premiumListing) {
-      premiumService.updateAnalytics(property.id, type);
-    }
-  };
-
-  // If property has premium listing, use PremiumPropertyCard
-  if (premiumListing) {
+  // Check if property has premium details
+  if (property.premiumDetails) {
     return (
       <PremiumPropertyCard 
         property={property} 
-        premiumListing={premiumListing}
-        onAnalyticsUpdate={handleAnalyticsUpdate}
+        premiumListing={property.premiumDetails}
       />
     );
   }
@@ -184,19 +159,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
           {purpose === 'sewa' && <span className="text-sm font-normal text-neutral-500">/bulan</span>}
         </p>
 
-        {/* Rating (using views as a proxy for popularity) */}
         <div className="flex items-center mb-2">
-          {Array.from({ length: 5 }).map((_, index) => {
-            // Calculate a "rating" based on views (1-5 stars)
-            const rating = Math.min(5, Math.max(3, Math.floor(views / 100) + 3));
-            return (
-              <Star 
-                key={index} 
-                size={14} 
-                className={index < rating ? "text-yellow-500 fill-current" : "text-neutral-300"} 
-              />
-            );
-          })}
           <span className="text-xs text-neutral-500 ml-1">({views} views)</span>
         </div>
 
@@ -208,7 +171,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
         <div className="flex items-center text-neutral-500 text-sm mb-3">
           <MapPin size={16} className="mr-1 flex-shrink-0" />
           <span className="truncate">
-            {location.district}, {location.city}
+            {location.district ? `${location.district}, ${location.city}` : location.city}
           </span>
         </div>
 

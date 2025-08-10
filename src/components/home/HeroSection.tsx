@@ -1,22 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import SearchBox from '../common/SearchBox';
 import { supabase } from '../../lib/supabase';
+import { useToast } from '../../contexts/ToastContext'; // ADD THIS LINE
 
 interface Stats {
   totalProperties: number;
-  totalProvinces: number;
-  totalAgents: number;
+  totalPropertiesForSale: number;
+  totalPropertiesForRent: number;
   totalUsers: number;
 }
 
 const HeroSection: React.FC = () => {
   const [stats, setStats] = useState<Stats>({
     totalProperties: 0,
-    totalProvinces: 0,
-    totalAgents: 0,
+    totalPropertiesForSale: 0,
+    totalPropertiesForRent: 0,
     totalUsers: 0
   });
   const [isLoading, setIsLoading] = useState(true);
+  const { showError } = useToast(); // ADD THIS LINE
 
   useEffect(() => {
     fetchStats();
@@ -26,41 +28,48 @@ const HeroSection: React.FC = () => {
     setIsLoading(true);
     try {
       // Get total properties count
-      const { count: propertiesCount } = await supabase
+      const { count: propertiesCount, error: propertiesError } = await supabase
         .from('listings')
         .select('*', { count: 'exact', head: true });
-      
-      // Get total provinces count
-      const { count: provincesCount } = await supabase
-        .from('locations')
+      if (propertiesError) throw propertiesError; // ADDED: Error check
+
+      // Get total properties for sale count
+      const { count: propertiesforsaleCount, error: forSaleError } = await supabase
+        .from('listings')
         .select('*', { count: 'exact', head: true })
-        .eq('type', 'provinsi');
+        .eq('purpose', 'jual');
+      if (forSaleError) throw forSaleError; // ADDED: Error check
       
-      // Get total agents count
-      const { count: agentsCount } = await supabase
-        .from('user_profiles')
+      // Get total properties for rent count
+      const { count: propertiesforrentCount, error: forRentError } = await supabase
+        .from('listings')
         .select('*', { count: 'exact', head: true })
-        .eq('role', 'agent');
+        .eq('purpose', 'sewa');
+      if (forRentError) throw forRentError; // ADDED: Error check
       
       // Get total users count
-      const { count: usersCount } = await supabase
+      const { count: usersCount, error: usersError } = await supabase
         .from('user_profiles')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true })
+        .in('role', ['user', 'agent'])
+        .eq('status', 'active');
+      if (usersError) throw usersError; // ADDED: Error check
       
       setStats({
         totalProperties: propertiesCount || 0,
-        totalProvinces: provincesCount || 0,
-        totalAgents: agentsCount || 0,
+        totalPropertiesForSale: propertiesforsaleCount || 0,
+        totalPropertiesForRent: propertiesforrentCount || 0,
         totalUsers: usersCount || 0
       });
-    } catch (error) {
+    } catch (error: any) { // MODIFIED: Catch error as 'any'
       console.error('Error fetching stats:', error);
+      showError('Error', error.message || 'Failed to load hero section statistics.'); // ADDED: User feedback
       // Use fallback values if there's an error
       setStats({
-        totalProperties: 10000,
-        totalProvinces: 34,
-        totalAgents: 500,
-        totalUsers: 15000
+        totalProperties: 0, // MODIFIED: Set to 0 on error
+        totalPropertiesForSale: 0,
+        totalPropertiesForRent: 0,
+        totalUsers: 0
       });
     } finally {
       setIsLoading(false);
@@ -106,21 +115,21 @@ const HeroSection: React.FC = () => {
             </div>
             <div className="text-center">
               <p className="font-heading font-bold text-2xl text-primary">
-                {isLoading ? '...' : stats.totalProvinces}
+                {isLoading ? '...' : stats.totalPropertiesForSale.toLocaleString()}+
               </p>
-              <p className="text-neutral-600 text-sm">Provinsi</p>
+              <p className="text-neutral-600 text-sm">Properti Dijual</p>
             </div>
             <div className="text-center">
               <p className="font-heading font-bold text-2xl text-primary">
-                {isLoading ? '...' : stats.totalAgents.toLocaleString()}+
+                {isLoading ? '...' : stats.totalPropertiesForRent.toLocaleString()}+
               </p>
-              <p className="text-neutral-600 text-sm">Agen Terpercaya</p>
+              <p className="text-neutral-600 text-sm">Properti Disewa</p>
             </div>
             <div className="text-center">
               <p className="font-heading font-bold text-2xl text-primary">
                 {isLoading ? '...' : stats.totalUsers.toLocaleString()}+
               </p>
-              <p className="text-neutral-600 text-sm">Klien Puas</p>
+              <p className="text-neutral-600 text-sm">Jumlah User</p>
             </div>
           </div>
         </div>

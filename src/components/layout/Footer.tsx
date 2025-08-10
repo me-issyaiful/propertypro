@@ -110,7 +110,6 @@ const Footer: React.FC = () => {
             <Link to="/sitemap" className="hover:text-primary transition-colors">Sitemap</Link>
             <Link to="/user/dashboard" className="hover:text-primary transition-colors">User Dashboard</Link>
             <Link to="/dashboard" className="hover:text-primary transition-colors">Agent Dashboard</Link>
-            <Link to="/admin/login" className="hover:text-primary transition-colors">Admin Login</Link>
           </div>
         </div>
       </div>

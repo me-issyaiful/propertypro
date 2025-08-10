@@ -94,14 +94,6 @@ const Header: React.FC = () => {
                     >
                       Dashboard
                     </Link>
-                    {user?.role === 'admin' || user?.role === 'superadmin' ? (
-                      <Link 
-                        to="/admin/dashboard" 
-                        className="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50"
-                      >
-                        Admin Panel
-                      </Link>
-                    ) : null}
                     <hr className="my-1" />
                     <button
                       onClick={handleLogout}
@@ -170,11 +162,6 @@ const Header: React.FC = () => {
                 <Link to="/user/properties" className="flex items-center space-x-2 py-2" onClick={toggleMenu}>
                   <span>Properti Saya</span>
                 </Link>
-                {user?.role === 'admin' || user?.role === 'superadmin' ? (
-                  <Link to="/admin/dashboard" className="flex items-center space-x-2 py-2" onClick={toggleMenu}>
-                    <span>Admin Panel</span>
-                  </Link>
-                ) : null}
                 <button
                   onClick={() => {
                     handleLogout();
